@@ -136,6 +136,17 @@ Add a local agent network layer:
 - local project board
 - network sync into agent exports and skills
 
+## Version 0.6
+
+Add Context Git integration:
+
+- local `.contextgit/` workflow state repository
+- context snapshots
+- semantic context branches
+- stable context tags
+- context export packets
+- network snapshot links
+
 ## Deferred Ideas
 
 - Optional project presets, only if they support the scriptable integration layer.

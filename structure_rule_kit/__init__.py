@@ -4,6 +4,17 @@ from .agent_ready import check_agent_ready
 from .agent_brief import build_agent_brief
 from .agent_export import export_agent, export_all_agents
 from .config import load_config, write_config
+from .context_git import (
+    checkout_context_branch,
+    create_context_branch,
+    create_context_snapshot,
+    create_context_tag,
+    export_context,
+    init_context,
+    latest_context_snapshot,
+    list_context_snapshots,
+    route_context,
+)
 from .context_pack import build_context_pack
 from .context_prune import build_context_prune
 from .decision_log import append_decision_log
@@ -21,6 +32,7 @@ from .network import (
     create_review,
     init_network,
     list_issues,
+    snapshot_network,
     sync_network,
 )
 from .rag_index import build_rag_index
@@ -49,7 +61,11 @@ __all__ = [
     "build_rag_index",
     "audit_toolbox",
     "check_agent_ready",
+    "checkout_context_branch",
     "create_agent_task",
+    "create_context_branch",
+    "create_context_snapshot",
+    "create_context_tag",
     "create_issue",
     "create_network_branch",
     "create_pr",
@@ -57,18 +73,24 @@ __all__ = [
     "export_structure",
     "export_agent",
     "export_all_agents",
+    "export_context",
     "export_skill",
+    "init_context",
     "init_network",
     "init_structure",
+    "latest_context_snapshot",
+    "list_context_snapshots",
     "list_issues",
     "list_resources",
     "load_config",
     "run_agent_task",
     "run_server",
+    "route_context",
     "read_resource",
     "scan_repo_map",
     "scaffold_mcp",
     "scaffold_skill",
+    "snapshot_network",
     "start_session",
     "sync_agent",
     "sync_network",

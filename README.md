@@ -74,6 +74,16 @@ structure-rule pr-create --title "implement parser" --issue issue-0001 --branch 
 structure-rule review-create --pr pr-0001 --decision approve
 structure-rule project-board
 structure-rule network-sync --target codex
+structure-rule context-init
+structure-rule context-snapshot --message "finished parser"
+structure-rule context-log
+structure-rule context-latest
+structure-rule context-branch experiment
+structure-rule context-checkout experiment
+structure-rule context-tag v0.6-plan --snapshot 0001
+structure-rule context-export
+structure-rule context-route
+structure-rule network-snapshot --message "parser ready for review"
 ```
 
 These commands do not prescribe how a project must be organized beyond the
@@ -126,6 +136,16 @@ for agent collaboration:
 - `project-board` writes a local board summary
 - `network-sync` connects the local network to agent exports, skills, brief, and
   MCP manifest output
+
+Version 0.6 adds a Context Git integration layer:
+
+- `context-init` creates `.contextgit/`
+- `context-snapshot` versions workflow state as agent-readable snapshots
+- `context-log` and `context-latest` recover snapshot history
+- `context-branch` and `context-checkout` track semantic workflow branches
+- `context-tag` marks stable checkpoints
+- `context-export` writes a recovery packet for future agents
+- `network-snapshot` links local agent network objects to a context snapshot
 
 ## Agent Toolbox
 
@@ -245,6 +265,51 @@ structure-rule review-create --pr pr-0001 --decision approve
 structure-rule project-board
 structure-rule network-sync --target codex
 ```
+
+## Context Git Layer
+
+0.6 adds a local semantic version-control layer for agent workflow state:
+
+```text
+.contextgit/
+├── HEAD
+├── config.json
+├── log.jsonl
+├── snapshots/
+├── branches/
+├── tags/
+├── roots/
+│   ├── rag/
+│   ├── mcp/
+│   ├── skills/
+│   ├── notebooks/
+│   └── structure/
+├── github/
+└── exports/
+```
+
+Git tracks file changes. Context Git tracks workflow state.
+
+```bash
+structure-rule context-init --project-name "Example"
+structure-rule context-snapshot --message "initial workflow state"
+structure-rule context-log
+structure-rule context-latest
+structure-rule context-branch experiment --purpose "try alternate route"
+structure-rule context-checkout experiment
+structure-rule context-tag v0.6-plan --snapshot 0001
+structure-rule context-export --include-roots
+```
+
+`network-snapshot` connects the 0.5 network layer to Context Git:
+
+```bash
+structure-rule network-snapshot --message "parser issue ready for review"
+```
+
+It refreshes the local board and agent brief, creates a context snapshot, and
+writes the snapshot id back to local issue, PR, and review records that do not
+already have `linked_snapshot`.
 
 ## Example Workflow
 

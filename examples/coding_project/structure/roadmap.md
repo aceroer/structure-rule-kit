@@ -29,6 +29,11 @@ MCP servers, and local skills.
 Add local agent network records for issues, branches, PRs, reviews, project
 boards, and network sync.
 
+## Version 0.6
+
+Add Context Git integration for workflow snapshots, semantic branches, tags,
+exports, and network snapshot links.
+
 ## Deferred Ideas
 
 - Optional presets, only if they support the integration tools.

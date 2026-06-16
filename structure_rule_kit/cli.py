@@ -9,6 +9,17 @@ from .agent_export import export_agent, export_all_agents
 from .agent_ready import check_agent_ready
 from .agent_sync import sync_agent
 from .config import write_config
+from .context_git import (
+    checkout_context_branch,
+    create_context_branch,
+    create_context_snapshot,
+    create_context_tag,
+    export_context,
+    init_context,
+    latest_context_snapshot,
+    list_context_snapshots,
+    route_context,
+)
 from .context_pack import build_context_pack
 from .context_prune import build_context_prune
 from .decision_log import append_decision_log
@@ -26,6 +37,7 @@ from .network import (
     create_review,
     init_network,
     list_issues,
+    snapshot_network,
     sync_network,
 )
 from .rag_index import build_rag_index
@@ -253,6 +265,53 @@ def main(argv: list[str] | None = None) -> int:
     network_sync_parser = subparsers.add_parser("network-sync", help="Sync local agent network with agent ecosystem outputs")
     network_sync_parser.add_argument("--path", default=".")
     network_sync_parser.add_argument("--target", default="codex", choices=["codex", "claude", "cursor", "generic"])
+
+    context_init_parser = subparsers.add_parser("context-init", help="Initialize local Context Git state")
+    context_init_parser.add_argument("--path", default=".")
+    context_init_parser.add_argument("--project-name", default="")
+    context_init_parser.add_argument("--force", action="store_true")
+
+    context_snapshot_parser = subparsers.add_parser("context-snapshot", help="Create a context snapshot")
+    context_snapshot_parser.add_argument("--path", default=".")
+    context_snapshot_parser.add_argument("--message", default="")
+    context_snapshot_parser.add_argument("--from-file", default="")
+    context_snapshot_parser.add_argument("--branch", default="")
+
+    context_log_parser = subparsers.add_parser("context-log", help="List context snapshots")
+    context_log_parser.add_argument("--path", default=".")
+    context_log_parser.add_argument("--json", action="store_true")
+
+    context_latest_parser = subparsers.add_parser("context-latest", help="Print latest context snapshot")
+    context_latest_parser.add_argument("--path", default=".")
+
+    context_branch_parser = subparsers.add_parser("context-branch", help="Create a context branch")
+    context_branch_parser.add_argument("name")
+    context_branch_parser.add_argument("--path", default=".")
+    context_branch_parser.add_argument("--purpose", default="")
+
+    context_checkout_parser = subparsers.add_parser("context-checkout", help="Switch context branch")
+    context_checkout_parser.add_argument("name")
+    context_checkout_parser.add_argument("--path", default=".")
+
+    context_tag_parser = subparsers.add_parser("context-tag", help="Create a context tag")
+    context_tag_parser.add_argument("name")
+    context_tag_parser.add_argument("--path", default=".")
+    context_tag_parser.add_argument("--snapshot", default="")
+    context_tag_parser.add_argument("--meaning", default="")
+
+    context_export_parser = subparsers.add_parser("context-export", help="Export context recovery packet")
+    context_export_parser.add_argument("--path", default=".")
+    context_export_parser.add_argument("--output", default=".contextgit/exports/CONTEXT_EXPORT.md")
+    context_export_parser.add_argument("--include-roots", action="store_true")
+
+    context_route_parser = subparsers.add_parser("context-route", help="Create context routing template")
+    context_route_parser.add_argument("--path", default=".")
+    context_route_parser.add_argument("--output", default=".contextgit/exports/routing.json")
+
+    network_snapshot_parser = subparsers.add_parser("network-snapshot", help="Snapshot local agent network into Context Git")
+    network_snapshot_parser.add_argument("--path", default=".")
+    network_snapshot_parser.add_argument("--message", default="Agent network snapshot")
+    network_snapshot_parser.add_argument("--target", default="codex", choices=["codex", "claude", "cursor", "generic"])
 
     args = parser.parse_args(argv)
 
@@ -581,6 +640,65 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Network sync: {report['status']}")
         print(f"Board: {Path(report['board'])}")
         return 0 if report["ready"] else 1
+
+    if args.command == "context-init":
+        report = init_context(args.path, project_name=args.project_name, force=args.force)
+        print(f"Initialized {Path(report['output'])}")
+        return 0
+
+    if args.command == "context-snapshot":
+        report = create_context_snapshot(
+            args.path,
+            message=args.message,
+            from_file=args.from_file,
+            branch=args.branch,
+        )
+        print(f"Snapshot {report['id']}: {Path(report['output'])}")
+        return 0
+
+    if args.command == "context-log":
+        entries = list_context_snapshots(args.path)
+        if args.json:
+            print(json.dumps(entries, indent=2))
+        else:
+            for item in entries:
+                print(f"{item['id']} {item['branch']} {item.get('message', '')}")
+        return 0
+
+    if args.command == "context-latest":
+        print(latest_context_snapshot(args.path))
+        return 0
+
+    if args.command == "context-branch":
+        report = create_context_branch(args.path, name=args.name, purpose=args.purpose)
+        print(f"Wrote {Path(report['output'])}")
+        return 0
+
+    if args.command == "context-checkout":
+        report = checkout_context_branch(args.path, name=args.name)
+        print(f"Checked out context branch {report['branch']}")
+        return 0
+
+    if args.command == "context-tag":
+        report = create_context_tag(args.path, name=args.name, snapshot=args.snapshot, meaning=args.meaning)
+        print(f"Wrote {Path(report['output'])}")
+        return 0
+
+    if args.command == "context-export":
+        report = export_context(args.path, output=args.output, include_roots=args.include_roots)
+        print(f"Wrote {Path(report['output'])}")
+        return 0
+
+    if args.command == "context-route":
+        report = route_context(args.path, output=args.output)
+        print(f"Wrote {Path(report['output'])}")
+        return 0
+
+    if args.command == "network-snapshot":
+        report = snapshot_network(args.path, message=args.message, target=args.target)
+        print(f"Snapshot {report['snapshot']}: {Path(report['snapshot_file'])}")
+        print(f"Updated network records: {len(report['updated'])}")
+        return 0
 
     parser.error("Unknown command")
     return 2

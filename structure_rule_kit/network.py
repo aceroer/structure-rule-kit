@@ -230,3 +230,37 @@ def sync_network(path: str = ".", target: str = "codex") -> dict:
     agent = sync_agent(path, target=target)
     _append_log(root, "network_sync", {"target": target, "board": board["output"], "status": agent["status"]})
     return {"board": board["output"], "agent_sync": agent, "status": agent["status"], "ready": agent["ready"]}
+
+
+def snapshot_network(path: str = ".", message: str = "Agent network snapshot", target: str = "codex") -> dict:
+    from .agent_brief import build_agent_brief
+    from .context_git import create_context_snapshot, init_context
+
+    root = _ensure_network(path)
+    init_context(path)
+    board = build_project_board(path)
+    brief = build_agent_brief(path, task=message, refresh=True)
+    snapshot = create_context_snapshot(path, message=message)
+
+    updated = []
+    for folder in ["issues", "prs", "reviews"]:
+        for item_path in (root / folder).glob("*.json"):
+            payload = json.loads(item_path.read_text(encoding="utf-8"))
+            if not payload.get("linked_snapshot"):
+                payload["linked_snapshot"] = snapshot["id"]
+                payload["updated_at"] = _now()
+                _write_json(item_path, payload)
+                updated.append(str(item_path))
+
+    _append_log(
+        root,
+        "network_snapshot",
+        {"snapshot": snapshot["id"], "message": message, "updated": len(updated), "target": target},
+    )
+    return {
+        "snapshot": snapshot["id"],
+        "snapshot_file": snapshot["output"],
+        "board": board["output"],
+        "brief": brief["output"],
+        "updated": updated,
+    }
