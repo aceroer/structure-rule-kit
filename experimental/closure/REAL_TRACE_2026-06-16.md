@@ -5,7 +5,7 @@ Date: 2026-06-16
 Repository:
 
 ```text
-https://github.com/aceroer/structure-rule-kit
+https://github.com/aceroer/Agent-GitHub-Worknet
 ```
 
 ## Purpose
@@ -28,7 +28,7 @@ PYTHONPATH=. python3 -m structure_rule_kit.cli issue-create \
 PYTHONPATH=. python3 -m structure_rule_kit.cli github-issue-create \
   issue-0001 \
   --path "$tmpdir" \
-  --repo aceroer/structure-rule-kit \
+  --repo aceroer/Agent-GitHub-Worknet \
   --apply \
   --skip-missing-labels
 ```
@@ -36,21 +36,21 @@ PYTHONPATH=. python3 -m structure_rule_kit.cli github-issue-create \
 Observed remote URL:
 
 ```text
-https://github.com/aceroer/structure-rule-kit/issues/1
+https://github.com/aceroer/Agent-GitHub-Worknet/issues/1
 ```
 
 The smoke issue was then closed:
 
 ```bash
 gh issue close 1 \
-  --repo aceroer/structure-rule-kit \
+  --repo aceroer/Agent-GitHub-Worknet \
   --comment "v0.9 smoke test completed; closing temporary verification issue."
 ```
 
 Verification:
 
 ```bash
-gh issue view 1 --repo aceroer/structure-rule-kit --json number,state,title,url
+gh issue view 1 --repo aceroer/Agent-GitHub-Worknet --json number,state,title,url
 ```
 
 Observed result:
@@ -60,7 +60,7 @@ Observed result:
   "number": 1,
   "state": "CLOSED",
   "title": "Structure Rule Kit 0.9 smoke test",
-  "url": "https://github.com/aceroer/structure-rule-kit/issues/1"
+  "url": "https://github.com/aceroer/Agent-GitHub-Worknet/issues/1"
 }
 ```
 
@@ -72,9 +72,9 @@ After successful issue creation, the local issue record stores:
 {
   "remote": {
     "provider": "github",
-    "repo": "aceroer/structure-rule-kit",
+    "repo": "aceroer/Agent-GitHub-Worknet",
     "number": 1,
-    "url": "https://github.com/aceroer/structure-rule-kit/issues/1",
+    "url": "https://github.com/aceroer/Agent-GitHub-Worknet/issues/1",
     "synced_at": "<local timestamp>"
   }
 }
