@@ -62,6 +62,11 @@ structure-rule run-task structure/tasks/20260616-add-parser.md --cmd "python3 -m
 structure-rule session-start --task "implement parser"
 structure-rule session-end --done "added parser" --next "review tests"
 structure-rule mcp-scaffold
+structure-rule agent-export --target codex
+structure-rule agent-export --target all
+structure-rule skill-export --name project-structure
+structure-rule agent-sync --target codex
+structure-rule mcp-server
 ```
 
 These commands do not prescribe how a project must be organized beyond the
@@ -94,6 +99,15 @@ Version 0.3 turns the toolbox into a lightweight workflow runner:
 - `session-start` and `session-end` standardize agent session entry and exit
 - `config` writes reusable defaults such as context budget and output paths
 - `mcp-scaffold` creates a minimal MCP resource server scaffold
+
+Version 0.4 adapts the workflow runner to external agent ecosystems:
+
+- `agent-export` writes agent entry files such as `AGENTS.md`, `CLAUDE.md`, and
+  `.cursor/rules/structure-rule.md`
+- `skill-export` writes a richer local skill backed by the current agent brief
+- `agent-sync` runs the full sync path for a target agent
+- `mcp-server` exposes Structure Rule files through a minimal JSON resource
+  endpoint
 
 ## Agent Toolbox
 
@@ -159,6 +173,33 @@ a handoff packet.
 
 `mcp-scaffold` writes `structure/mcp_server.py`, a minimal resource scaffold that
 can expose Structure Rule files to an MCP layer.
+
+## Agent Ecosystem
+
+`agent-export` writes external agent instruction files:
+
+```bash
+structure-rule agent-export --target codex
+structure-rule agent-export --target claude
+structure-rule agent-export --target cursor
+structure-rule agent-export --target all
+```
+
+`skill-export` writes a richer `skills/<name>/SKILL.md` using the current
+project summary, rules, toolbox commands, metrics, and agent brief.
+
+`agent-sync` runs a complete integration pass:
+
+```text
+repo-map -> agent-ready -> context-prune -> agent-brief -> agent-export -> skill-export -> mcp-manifest
+```
+
+`mcp-server` provides a minimal JSON resource endpoint:
+
+```bash
+structure-rule mcp-server
+structure-rule mcp-server --request '{"method":"resources/read","params":{"uri":"structure-rule://STRUCTURE_RULE.md"}}'
+```
 
 ## Example Workflow
 

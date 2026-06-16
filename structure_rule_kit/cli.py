@@ -5,7 +5,9 @@ import json
 from pathlib import Path
 
 from .agent_brief import build_agent_brief
+from .agent_export import export_agent, export_all_agents
 from .agent_ready import check_agent_ready
+from .agent_sync import sync_agent
 from .config import write_config
 from .context_pack import build_context_pack
 from .context_prune import build_context_prune
@@ -15,11 +17,13 @@ from .generator import init_structure
 from .handoff import build_handoff_pack
 from .mcp_manifest import build_mcp_manifest
 from .mcp_scaffold import scaffold_mcp
+from .mcp_server import run_server
 from .rag_index import build_rag_index
 from .repo_map import scan_repo_map
 from .run_task import run_agent_task
 from .session import end_session, start_session
 from .skill_scaffold import scaffold_skill
+from .skill_export import export_skill
 from .status_update import update_status
 from .summary import summarize_structure
 from .task import create_agent_task
@@ -170,6 +174,28 @@ def main(argv: list[str] | None = None) -> int:
     mcp_scaffold_parser.add_argument("--path", default=".")
     mcp_scaffold_parser.add_argument("--output", default="structure/mcp_server.py")
     mcp_scaffold_parser.add_argument("--force", action="store_true")
+
+    agent_export_parser = subparsers.add_parser("agent-export", help="Export instructions for external agent ecosystems")
+    agent_export_parser.add_argument("--path", default=".")
+    agent_export_parser.add_argument("--target", default="generic", choices=["codex", "claude", "cursor", "generic", "all"])
+    agent_export_parser.add_argument("--output", default="")
+    agent_export_parser.add_argument("--no-refresh", action="store_true")
+
+    skill_export_parser = subparsers.add_parser("skill-export", help="Export a richer local skill from project structure")
+    skill_export_parser.add_argument("--path", default=".")
+    skill_export_parser.add_argument("--name", default="project-structure")
+    skill_export_parser.add_argument("--output-dir", default="skills")
+    skill_export_parser.add_argument("--no-refresh", action="store_true")
+
+    sync_parser = subparsers.add_parser("agent-sync", help="Run the full agent ecosystem sync")
+    sync_parser.add_argument("--path", default=".")
+    sync_parser.add_argument("--target", default="codex", choices=["codex", "claude", "cursor", "generic"])
+    sync_parser.add_argument("--skill-name", default="project-structure")
+    sync_parser.add_argument("--budget", type=int, default=None)
+
+    mcp_server_parser = subparsers.add_parser("mcp-server", help="Run a minimal JSON MCP-like resource endpoint")
+    mcp_server_parser.add_argument("--path", default=".")
+    mcp_server_parser.add_argument("--request", default="")
 
     args = parser.parse_args(argv)
 
@@ -396,6 +422,35 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "mcp-scaffold":
         report = scaffold_mcp(args.path, output=args.output, force=args.force)
         print(f"{'Wrote' if report['created'] else 'Exists'} {Path(report['output'])}")
+        return 0
+
+    if args.command == "agent-export":
+        if args.target == "all":
+            report = export_all_agents(args.path, refresh=not args.no_refresh)
+            for item in report["outputs"]:
+                print(f"Wrote {Path(item)}")
+        else:
+            report = export_agent(args.path, target=args.target, output=args.output, refresh=not args.no_refresh)
+            for item in report["outputs"]:
+                print(f"Wrote {Path(item)}")
+        return 0
+
+    if args.command == "skill-export":
+        report = export_skill(args.path, name=args.name, output_dir=args.output_dir, refresh=not args.no_refresh)
+        print(f"Wrote {Path(report['output'])}")
+        return 0
+
+    if args.command == "agent-sync":
+        report = sync_agent(args.path, target=args.target, skill_name=args.skill_name, budget=args.budget)
+        print(f"Agent sync: {report['status']}")
+        print(f"Brief: {Path(report['brief'])}")
+        for item in report["agent_outputs"]:
+            print(f"Agent file: {Path(item)}")
+        print(f"Skill: {Path(report['skill'])}")
+        return 0 if report["ready"] else 1
+
+    if args.command == "mcp-server":
+        print(json.dumps(run_server(args.path, args.request), indent=2))
         return 0
 
     parser.error("Unknown command")
