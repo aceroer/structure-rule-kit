@@ -110,12 +110,13 @@ Add scriptable agent integration tools rather than more templates:
 
 ## Version 0.3
 
-Add lifecycle automation:
+Add a lightweight workflow runner:
 
-- update status from command-line events
-- check whether a task is ready for agent execution
-- generate agent handoff packets
-- record tool runs and verification evidence
+- generate agent startup briefs
+- run structured task files and record verification evidence
+- standardize session start and session end
+- write reusable config defaults
+- scaffold a minimal MCP resource server
 
 ## Long-Term Direction
 

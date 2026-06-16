@@ -16,7 +16,8 @@ Add scriptable agent integration:
 
 ## Version 0.3
 
-Add lifecycle automation for status updates, handoffs, and verification logs.
+Add workflow runner commands for agent briefs, structured task execution,
+session start/end, config defaults, and MCP scaffolding.
 
 ## Long-Term Direction
 

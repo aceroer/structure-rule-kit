@@ -56,6 +56,12 @@ structure-rule verify-log --cmd "python3 -m py_compile structure_rule_kit/*.py" 
 structure-rule decision-log --decision "0.2 focuses on scriptable tools"
 structure-rule context-prune --budget 8000
 structure-rule repo-map
+structure-rule config
+structure-rule agent-brief --task "implement parser"
+structure-rule run-task structure/tasks/20260616-add-parser.md --cmd "python3 -m pytest"
+structure-rule session-start --task "implement parser"
+structure-rule session-end --done "added parser" --next "review tests"
+structure-rule mcp-scaffold
 ```
 
 These commands do not prescribe how a project must be organized beyond the
@@ -78,6 +84,16 @@ Version 0.2 will focus on scriptable agent integration:
 The goal is not to create many project templates. The goal is to make existing
 project structure easier for coding agents, research agents, MCP servers, and
 local skills to read and reuse.
+
+Version 0.3 turns the toolbox into a lightweight workflow runner:
+
+- `agent-brief` builds a startup packet from readiness, repo map, pruned context,
+  task state, decision log, and verification log
+- `run-task` executes a structured task and writes verification evidence back
+  into the task result
+- `session-start` and `session-end` standardize agent session entry and exit
+- `config` writes reusable defaults such as context budget and output paths
+- `mcp-scaffold` creates a minimal MCP resource server scaffold
 
 ## Agent Toolbox
 
@@ -125,6 +141,25 @@ are kept before lower-priority notes.
 `repo-map` scans the repository and writes `structure/repo_map.md` with source,
 test, documentation, configuration, generated, and other files.
 
+## Workflow Runner
+
+`config` writes `structure/config.json` with reusable defaults for context
+budget, repo-map size, and output paths.
+
+`agent-brief` refreshes the repo map and pruned context pack, then writes
+`STRUCTURE_AGENT_BRIEF.md`, a startup packet for a coding or research agent.
+
+`run-task` runs a command for a task file under `structure/tasks/`, appends
+verification evidence, and updates the task's `Result` section.
+
+`session-start` creates a task, updates status, and writes an agent brief.
+
+`session-end` updates status, optionally records final verification, and writes
+a handoff packet.
+
+`mcp-scaffold` writes `structure/mcp_server.py`, a minimal resource scaffold that
+can expose Structure Rule files to an MCP layer.
+
 ## Example Workflow
 
 ```bash
@@ -136,6 +171,15 @@ structure-rule context-prune --budget 8000
 structure-rule verify-log --cmd "python3 -m py_compile structure_rule_kit/*.py tests/*.py" --run
 structure-rule status-update --done "added parser" --next "review tests"
 structure-rule handoff-pack --task "review parser implementation"
+```
+
+0.3 workflow-runner flow:
+
+```bash
+structure-rule config
+structure-rule session-start --task "add parser" --goal "create parser utility"
+structure-rule run-task structure/tasks/20260616-add-parser.md --cmd "python3 -m pytest"
+structure-rule session-end --done "added parser" --next "review implementation"
 ```
 
 This keeps the project structure, task state, verification evidence, and handoff

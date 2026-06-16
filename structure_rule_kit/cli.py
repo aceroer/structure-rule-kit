@@ -4,7 +4,9 @@ import argparse
 import json
 from pathlib import Path
 
+from .agent_brief import build_agent_brief
 from .agent_ready import check_agent_ready
+from .config import write_config
 from .context_pack import build_context_pack
 from .context_prune import build_context_prune
 from .decision_log import append_decision_log
@@ -12,8 +14,11 @@ from .exporter import export_structure
 from .generator import init_structure
 from .handoff import build_handoff_pack
 from .mcp_manifest import build_mcp_manifest
+from .mcp_scaffold import scaffold_mcp
 from .rag_index import build_rag_index
 from .repo_map import scan_repo_map
+from .run_task import run_agent_task
+from .session import end_session, start_session
 from .skill_scaffold import scaffold_skill
 from .status_update import update_status
 from .summary import summarize_structure
@@ -126,6 +131,45 @@ def main(argv: list[str] | None = None) -> int:
     repo_parser.add_argument("--path", default=".")
     repo_parser.add_argument("--output", default="structure/repo_map.md")
     repo_parser.add_argument("--max-files", type=int, default=240)
+
+    config_parser = subparsers.add_parser("config", help="Write structure/config.json defaults")
+    config_parser.add_argument("--path", default=".")
+    config_parser.add_argument("--output", default="structure/config.json")
+    config_parser.add_argument("--force", action="store_true")
+
+    brief_parser = subparsers.add_parser("agent-brief", help="Build an agent startup brief")
+    brief_parser.add_argument("--path", default=".")
+    brief_parser.add_argument("--task", default="")
+    brief_parser.add_argument("--output", default="")
+    brief_parser.add_argument("--budget", type=int, default=None)
+    brief_parser.add_argument("--no-refresh", action="store_true")
+
+    run_parser = subparsers.add_parser("run-task", help="Run a structured agent task")
+    run_parser.add_argument("task_file")
+    run_parser.add_argument("--path", default=".")
+    run_parser.add_argument("--cmd", default="")
+    run_parser.add_argument("--timeout", type=int, default=120)
+    run_parser.add_argument("--update-status", action="store_true")
+
+    start_parser = subparsers.add_parser("session-start", help="Start an agent session")
+    start_parser.add_argument("--path", default=".")
+    start_parser.add_argument("--task", default="")
+    start_parser.add_argument("--goal", default="")
+    start_parser.add_argument("--budget", type=int, default=None)
+    start_parser.add_argument("--output", default="")
+
+    end_parser = subparsers.add_parser("session-end", help="End an agent session")
+    end_parser.add_argument("--path", default=".")
+    end_parser.add_argument("--done", default="")
+    end_parser.add_argument("--next", default="", dest="next_step")
+    end_parser.add_argument("--cmd", default="")
+    end_parser.add_argument("--run", action="store_true")
+    end_parser.add_argument("--handoff-output", default="")
+
+    mcp_scaffold_parser = subparsers.add_parser("mcp-scaffold", help="Create a minimal MCP resource server scaffold")
+    mcp_scaffold_parser.add_argument("--path", default=".")
+    mcp_scaffold_parser.add_argument("--output", default="structure/mcp_server.py")
+    mcp_scaffold_parser.add_argument("--force", action="store_true")
 
     args = parser.parse_args(argv)
 
@@ -293,6 +337,65 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "repo-map":
         report = scan_repo_map(args.path, output=args.output, max_files=args.max_files)
         print(f"Wrote {Path(report['output'])} with {report['files']} files.")
+        return 0
+
+    if args.command == "config":
+        report = write_config(args.path, output=args.output, force=args.force)
+        print(f"{'Wrote' if report['created'] else 'Exists'} {Path(report['output'])}")
+        return 0
+
+    if args.command == "agent-brief":
+        report = build_agent_brief(
+            args.path,
+            task=args.task,
+            output=args.output,
+            budget=args.budget,
+            refresh=not args.no_refresh,
+        )
+        print(f"Wrote {Path(report['output'])} ({report['status']})")
+        return 0 if report["ready"] else 1
+
+    if args.command == "run-task":
+        report = run_agent_task(
+            args.task_file,
+            command=args.cmd,
+            path=args.path,
+            update_project_status=args.update_status,
+            timeout=args.timeout,
+        )
+        print(f"Task result: {report['result']} ({report['task']})")
+        return 0 if report["exit_code"] in (None, 0) else 1
+
+    if args.command == "session-start":
+        report = start_session(
+            args.path,
+            task=args.task,
+            goal=args.goal,
+            budget=args.budget,
+            output=args.output,
+        )
+        print(f"Wrote {Path(report['brief'])} ({report['status']})")
+        print(f"Task: {Path(report['task'])}")
+        return 0 if report["status"] == "ready" else 1
+
+    if args.command == "session-end":
+        report = end_session(
+            args.path,
+            done=args.done,
+            next_step=args.next_step,
+            command=args.cmd,
+            run=args.run,
+            handoff_output=args.handoff_output,
+        )
+        print(f"Updated {Path(report['status'])}")
+        print(f"Wrote {Path(report['handoff'])}")
+        if report["verification"]:
+            print(f"Verification: {Path(report['verification'])}")
+        return 0
+
+    if args.command == "mcp-scaffold":
+        report = scaffold_mcp(args.path, output=args.output, force=args.force)
+        print(f"{'Wrote' if report['created'] else 'Exists'} {Path(report['output'])}")
         return 0
 
     parser.error("Unknown command")
