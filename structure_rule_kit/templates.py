@@ -223,6 +223,17 @@ Prepare real model API integration:
 - response records and model API audit log
 - OpenAI-compatible chat-completions transport
 
+## Version 1.4
+
+Add a stream-structured runtime backend:
+
+- P1-P13 corporate role model
+- P12 CEO agent orchestration layer
+- P13 human supervisor takeover layer
+- append-only runtime streams
+- subagent assignments to streams and issues
+- CEO plans and runtime status summaries
+
 ## Deferred Ideas
 
 - Optional project presets, only if they support the scriptable integration layer.

@@ -44,6 +44,12 @@ The 1.3 model API loop adds a real provider boundary:
 provider config -> doctor -> request packet -> dry-run -> approval token -> live model call
 ```
 
+The 1.4 runtime loop is stream-structured rather than tree-structured:
+
+```text
+issue -> stream -> CEO plan -> assignment -> stream events -> human takeover when needed
+```
+
 ## Install
 
 ```bash
@@ -144,6 +150,17 @@ structure-rule model-provider-set --provider openai --model "$MODEL_NAME"
 structure-rule model-doctor
 structure-rule model-request --prompt "Plan the next step." --subagent subagent-0001
 structure-rule model-call model-request-0001
+```
+
+Start a stream runtime with corporate P-level roles:
+
+```bash
+structure-rule runtime-init
+structure-rule role-show --level P12
+structure-rule agent-promote subagent-0001 --level P12
+structure-rule stream-start --issue issue-0001 --ceo-agent subagent-0001
+structure-rule ceo-plan --issue issue-0001 --stream stream-0001 --ceo-agent subagent-0001
+structure-rule human-takeover stream-0001 --reason "Manual review"
 ```
 
 The sync report is written to:
@@ -415,6 +432,92 @@ This version supports OpenAI-compatible chat-completions style providers through
 standard HTTPS calls and keeps the default model unset until the project owner
 chooses one.
 
+## 1.4 Stream Runtime Commands
+
+The 1.4 layer adds a backend runtime without adding a dashboard. Its philosophy
+is stream-based, not tree-based: work advances through append-only event flows
+that can be frozen, resumed, assigned, and taken over.
+
+It stores runtime state under:
+
+```text
+structure/worknet/runtime/
+├── streams/
+│   └── stream-0001.jsonl
+├── roles/
+│   └── corporate_levels.json
+├── assignments/
+│   └── assignment-0001.json
+├── ceo_plans/
+│   └── ceo-plan-0001-stream-0001.json
+├── current_stream.json
+└── runtime_log.jsonl
+```
+
+`runtime-init` creates the stream runtime and P1-P13 corporate role model:
+
+```bash
+structure-rule runtime-init
+structure-rule role-show
+structure-rule role-show --level P12
+```
+
+The default supervision model has two layers:
+
+- `P12` CEO Agent: global orchestration, delegation, stream routing, escalation
+- `P13` Human Supervisor: final owner, approval, revocation, takeover
+
+`agent-promote` assigns a corporate level to a governed subagent:
+
+```bash
+structure-rule agent-promote subagent-0001 --level P6
+structure-rule agent-promote subagent-0002 --level P12
+```
+
+`level-check` verifies whether a level has a capability:
+
+```bash
+structure-rule level-check --level P6 --capability verify_commands
+structure-rule level-check --level P2 --capability verify_commands
+```
+
+`stream-start` opens an append-only runtime stream:
+
+```bash
+structure-rule stream-start --issue issue-0001 --ceo-agent subagent-0002
+```
+
+`stream-event` appends observations, tool results, approvals, or other runtime
+events:
+
+```bash
+structure-rule stream-event stream-0001 --type observation --message "Loaded context."
+```
+
+`assignment-create` binds a subagent to a stream or issue:
+
+```bash
+structure-rule assignment-create \
+  --subagent subagent-0001 \
+  --stream stream-0001 \
+  --duty "Verify the implementation route."
+```
+
+`ceo-plan` creates the P12 global coordination plan while preserving P13 gates:
+
+```bash
+structure-rule ceo-plan --issue issue-0001 --stream stream-0001 --ceo-agent subagent-0002
+```
+
+`human-takeover` lets the P13 supervisor pause or redirect the stream:
+
+```bash
+structure-rule human-takeover stream-0001 --reason "Manual review before remote write."
+```
+
+This is the backend runtime layer that sits above Git, Context Git, worknet
+objects, governance, and model API packets.
+
 ## Local Network Model
 
 Agent GitHub Worknet stores local collaboration objects under:
@@ -450,6 +553,8 @@ Model-agent actions also pass through governance checks:
 - apply-level work requires an approval record and capability token
 - dangerous commands are denied by default
 - live model API calls require `model-call --apply` and a matching token
+- stream runtime authority is expressed through P1-P13 corporate levels
+- P12 CEO agents still cannot override P13 human gates
 
 Duplicate protection is built in:
 
@@ -505,12 +610,12 @@ the path toward the 1.0 closure release.
 Current stable version:
 
 ```text
-1.3.0
+1.4.0
 ```
 
-The 1.3 release adds the model API preparation layer: provider config, API
-doctor checks, request packet generation, dry-run calls, capability-token gates,
-and a governed live-call path for OpenAI-compatible chat-completions providers.
+The 1.4 release adds the stream runtime backend: P1-P13 corporate roles, CEO
+agent planning, human supervisor takeover, stream events, assignments, runtime
+status, and append-only runtime logs.
 
 ## Philosophy
 

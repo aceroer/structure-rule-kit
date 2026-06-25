@@ -90,6 +90,19 @@ from .network import (
 from .rag_index import build_rag_index
 from .repo_map import scan_repo_map
 from .run_task import run_agent_task
+from .runtime import (
+    agent_promote,
+    assignment_create,
+    ceo_plan,
+    human_takeover,
+    level_allows,
+    role_show,
+    runtime_init,
+    runtime_status,
+    stream_event,
+    stream_show,
+    stream_start,
+)
 from .session import end_session, start_session
 from .skill_scaffold import scaffold_skill
 from .skill_export import export_skill
@@ -617,6 +630,72 @@ def main(argv: list[str] | None = None) -> int:
     model_call_parser.add_argument("--path", default=".")
     model_call_parser.add_argument("--apply", action="store_true")
     model_call_parser.add_argument("--json", action="store_true")
+
+    runtime_init_parser = subparsers.add_parser("runtime-init", help="Initialize stream runtime and corporate roles")
+    runtime_init_parser.add_argument("--path", default=".")
+    runtime_init_parser.add_argument("--force", action="store_true")
+
+    role_show_parser = subparsers.add_parser("role-show", help="Show P1-P13 corporate role model")
+    role_show_parser.add_argument("--path", default=".")
+    role_show_parser.add_argument("--level", default="")
+    role_show_parser.add_argument("--json", action="store_true")
+
+    level_check_parser = subparsers.add_parser("level-check", help="Check whether a P-level has a capability")
+    level_check_parser.add_argument("--path", default=".")
+    level_check_parser.add_argument("--level", default="P1")
+    level_check_parser.add_argument("--capability", default="")
+    level_check_parser.add_argument("--json", action="store_true")
+
+    agent_promote_parser = subparsers.add_parser("agent-promote", help="Assign a P-level to a governed subagent")
+    agent_promote_parser.add_argument("subagent")
+    agent_promote_parser.add_argument("--path", default=".")
+    agent_promote_parser.add_argument("--level", default="P3")
+    agent_promote_parser.add_argument("--title", default="")
+
+    assignment_parser = subparsers.add_parser("assignment-create", help="Assign a subagent to a stream or issue")
+    assignment_parser.add_argument("--path", default=".")
+    assignment_parser.add_argument("--subagent", default="")
+    assignment_parser.add_argument("--stream", default="")
+    assignment_parser.add_argument("--issue", default="")
+    assignment_parser.add_argument("--duty", default="")
+    assignment_parser.add_argument("--level", default="")
+
+    stream_start_parser = subparsers.add_parser("stream-start", help="Start a stream-structured runtime flow")
+    stream_start_parser.add_argument("--path", default=".")
+    stream_start_parser.add_argument("--issue", default="")
+    stream_start_parser.add_argument("--title", default="")
+    stream_start_parser.add_argument("--ceo-agent", default="")
+    stream_start_parser.add_argument("--supervisor", default="human")
+
+    stream_event_parser = subparsers.add_parser("stream-event", help="Append an event to a runtime stream")
+    stream_event_parser.add_argument("stream")
+    stream_event_parser.add_argument("--path", default=".")
+    stream_event_parser.add_argument("--type", default="observation", dest="event_type")
+    stream_event_parser.add_argument("--message", default="")
+    stream_event_parser.add_argument("--actor", default="")
+    stream_event_parser.add_argument("--payload", default="")
+
+    stream_show_parser = subparsers.add_parser("stream-show", help="Show stream events")
+    stream_show_parser.add_argument("stream")
+    stream_show_parser.add_argument("--path", default=".")
+    stream_show_parser.add_argument("--json", action="store_true")
+
+    ceo_plan_parser = subparsers.add_parser("ceo-plan", help="Create a CEO agent stream plan")
+    ceo_plan_parser.add_argument("--path", default=".")
+    ceo_plan_parser.add_argument("--issue", default="")
+    ceo_plan_parser.add_argument("--stream", default="")
+    ceo_plan_parser.add_argument("--ceo-agent", default="")
+    ceo_plan_parser.add_argument("--objective", default="")
+
+    human_takeover_parser = subparsers.add_parser("human-takeover", help="Let a P13 human supervisor take over a stream")
+    human_takeover_parser.add_argument("stream")
+    human_takeover_parser.add_argument("--path", default=".")
+    human_takeover_parser.add_argument("--reason", default="")
+    human_takeover_parser.add_argument("--actor", default="human")
+
+    runtime_status_parser = subparsers.add_parser("runtime-status", help="Show stream runtime status")
+    runtime_status_parser.add_argument("--path", default=".")
+    runtime_status_parser.add_argument("--json", action="store_true")
 
     args = parser.parse_args(argv)
 
@@ -1391,6 +1470,119 @@ def main(argv: list[str] | None = None) -> int:
             if report.get("message"):
                 print(report["message"])
         return 0 if report["ok"] else 1
+
+    if args.command == "runtime-init":
+        report = runtime_init(args.path, force=args.force)
+        print(f"Runtime: {Path(report['output'])}")
+        print(f"Roles: {Path(report['roles'])}")
+        return 0
+
+    if args.command == "role-show":
+        report = role_show(args.path, level=args.level)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        elif args.level:
+            role = report["role"]
+            print(f"{report['level']}: {role['title']}")
+            print(role["scope"])
+        else:
+            print(f"Role model version: {report['version']}")
+            for level, role in report["levels"].items():
+                print(f"- {level}: {role['title']}")
+        return 0
+
+    if args.command == "level-check":
+        report = level_allows(args.path, level=args.level, capability=args.capability)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print("ALLOWED" if report["ok"] else "DENIED")
+            print(f"Level: {report['level']}")
+            if args.capability:
+                print(f"Capability: {args.capability}")
+        return 0 if report["ok"] else 1
+
+    if args.command == "agent-promote":
+        report = agent_promote(args.path, subagent=args.subagent, level=args.level, title=args.title)
+        print(f"Promoted {report['id']} to {report['level']}: {Path(report['output'])}")
+        return 0
+
+    if args.command == "assignment-create":
+        report = assignment_create(
+            args.path,
+            subagent=args.subagent,
+            stream=args.stream,
+            issue=args.issue,
+            duty=args.duty,
+            level=args.level,
+        )
+        print(f"Assigned {report['id']}: {Path(report['output'])}")
+        return 0
+
+    if args.command == "stream-start":
+        report = stream_start(
+            args.path,
+            issue=args.issue,
+            title=args.title,
+            ceo_agent=args.ceo_agent,
+            supervisor=args.supervisor,
+        )
+        print(f"Started {report['id']}: {Path(report['output'])}")
+        return 0
+
+    if args.command == "stream-event":
+        payload = json.loads(args.payload) if args.payload else {}
+        report = stream_event(
+            args.path,
+            stream=args.stream,
+            event_type=args.event_type,
+            message=args.message,
+            actor=args.actor,
+            payload=payload,
+        )
+        print(f"Appended {report['event']['event_id']} to {report['stream']}")
+        return 0
+
+    if args.command == "stream-show":
+        report = stream_show(args.path, stream=args.stream)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print(f"Stream: {report['stream']}")
+            print(f"Events: {report['count']}")
+            for event in report["events"]:
+                print(f"- {event['event_id']} {event['type']}: {event.get('message', '')}")
+        return 0
+
+    if args.command == "ceo-plan":
+        report = ceo_plan(
+            args.path,
+            issue=args.issue,
+            stream=args.stream,
+            ceo_agent=args.ceo_agent,
+            objective=args.objective,
+        )
+        print(f"CEO plan {report['id']}: {Path(report['output'])}")
+        print(f"Stream: {report['stream']}")
+        return 0
+
+    if args.command == "human-takeover":
+        report = human_takeover(args.path, stream=args.stream, reason=args.reason, actor=args.actor)
+        print(f"Human takeover: {report['event']['event_id']} on {report['stream']}")
+        return 0
+
+    if args.command == "runtime-status":
+        report = runtime_status(args.path)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print("READY" if report["ready"] else "NEEDS SETUP")
+            print(f"Streams: {report['streams']}")
+            print(f"Assignments: {report['assignments']}")
+            print(f"CEO plans: {report['ceo_plans']}")
+            if report["current"]:
+                print(f"Current stream: {report['current'].get('stream')} ({report['current'].get('state')})")
+        return 0 if report["ready"] else 1
 
     parser.error("Unknown command")
     return 2
