@@ -5,6 +5,10 @@ A local-first GitHub work network for AI agents.
 Agent GitHub Worknet lets coding and research agents create, track, sync, and
 reconcile GitHub-like work objects without losing local project structure.
 
+If you are new to the project, start with [Why Agent GitHub Worknet](WHY_GNW.md).
+It explains why this is an organization and governance layer for coding agents,
+not another coding agent runtime.
+
 It is built on the `structure-rule-kit` package and the `structure-rule` CLI.
 The package name remains stable for installation and compatibility; the project
 identity is Agent GitHub Worknet.
