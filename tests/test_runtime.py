@@ -6,6 +6,10 @@ from structure_rule_kit import (
     assignment_create,
     ceo_plan,
     create_issue,
+    executive_appoint,
+    executive_board,
+    executive_delegate,
+    executive_report,
     human_takeover,
     init_structure,
     level_allows,
@@ -100,6 +104,59 @@ def test_ceo_plan_creates_stream_and_plan(tmp_path):
     assert shown["events"][-1]["type"] == "ceo_plan"
 
 
+def test_executive_board_appointments_delegate_and_report(tmp_path):
+    ceo = seed_runtime_project(tmp_path)
+    cto = subagent_create(str(tmp_path), permission="draft", issue="issue-0001")
+    cfo = subagent_create(str(tmp_path), permission="draft", issue="issue-0001")
+    agent_promote(str(tmp_path), subagent=ceo["id"], level="P12")
+    stream = stream_start(str(tmp_path), issue="issue-0001", ceo_agent=ceo["id"])
+
+    board = executive_board(str(tmp_path))
+    appointment = executive_appoint(str(tmp_path), office="CTO", subagent=cto["id"], by=ceo["id"])
+    executive_appoint(str(tmp_path), office="CFO", subagent=cfo["id"], by=ceo["id"])
+    delegated = executive_delegate(
+        str(tmp_path),
+        office="CTO",
+        stream=stream["id"],
+        duty="Own the technical route.",
+        by=ceo["id"],
+    )
+    report = executive_report(
+        str(tmp_path),
+        office="CFO",
+        stream=stream["id"],
+        summary="Token usage is within budget.",
+    )
+    shown = stream_show(str(tmp_path), stream=stream["id"])
+    status = runtime_status(str(tmp_path))
+
+    assert {"COO", "CTO", "CFO", "CSO", "CRO"}.issubset(board["offices"])
+    assert appointment["payload"]["title"] == "Chief Technology Officer Agent"
+    assert appointment["payload"]["level"] == "P11"
+    assert executive_board(str(tmp_path), office="CTO")["appointment"]["subagent"] == cto["id"]
+    assert delegated["assignment"]["payload"]["subagent"] == cto["id"]
+    assert report["payload"]["office"] == "CFO"
+    assert shown["events"][-2]["type"] == "executive_delegate"
+    assert shown["events"][-1]["type"] == "executive_report"
+    assert status["executive_appointments"] == 2
+    assert status["executive_reports"] == 1
+
+
+def test_executive_appoint_requires_ceo_or_human(tmp_path):
+    junior = seed_runtime_project(tmp_path)
+    cto = subagent_create(str(tmp_path), permission="draft", issue="issue-0001")
+
+    try:
+        executive_appoint(str(tmp_path), office="CTO", subagent=cto["id"], by=junior["id"])
+    except PermissionError as exc:
+        assert "P12 CEO" in str(exc)
+    else:
+        raise AssertionError("Expected junior executive appointment to be denied.")
+
+    human = executive_appoint(str(tmp_path), office="CTO", subagent=cto["id"], by="human")
+    assert human["payload"]["appointed_by"] == "human"
+
+
 def test_runtime_cli_commands(tmp_path):
     subagent = seed_runtime_project(tmp_path)
 
@@ -113,10 +170,16 @@ def test_runtime_cli_commands(tmp_path):
     assert main(["stream-event", "stream-0001", "--path", str(tmp_path), "--type", "observation", "--message", "Observed."]) == 0
     assert main(["ceo-plan", "--path", str(tmp_path), "--issue", "issue-0001", "--stream", "stream-0001", "--ceo-agent", subagent["id"]]) == 0
     assert main(["human-takeover", "stream-0001", "--path", str(tmp_path), "--reason", "Review."]) == 0
+    assert main(["executive-board", "--path", str(tmp_path)]) == 0
+    assert main(["executive-appoint", "--path", str(tmp_path), "--office", "COO", "--subagent", subagent["id"], "--by", "human"]) == 0
+    assert main(["executive-delegate", "--path", str(tmp_path), "--office", "COO", "--stream", "stream-0001", "--duty", "Own delivery."]) == 0
+    assert main(["executive-report", "--path", str(tmp_path), "--office", "COO", "--stream", "stream-0001", "--summary", "Delivery stream stable."]) == 0
     assert main(["stream-show", "stream-0001", "--path", str(tmp_path)]) == 0
     assert main(["runtime-status", "--path", str(tmp_path)]) == 0
 
     status = runtime_status(str(tmp_path))
     assert status["streams"] == 1
-    assert status["assignments"] == 1
+    assert status["assignments"] == 2
     assert status["ceo_plans"] == 1
+    assert status["executive_appointments"] == 1
+    assert status["executive_reports"] == 1

@@ -163,6 +163,15 @@ structure-rule ceo-plan --issue issue-0001 --stream stream-0001 --ceo-agent suba
 structure-rule human-takeover stream-0001 --reason "Manual review"
 ```
 
+Appoint executive agents under the CEO:
+
+```bash
+structure-rule executive-board
+structure-rule executive-appoint --office CTO --subagent subagent-0002 --by subagent-0001
+structure-rule executive-delegate --office CTO --stream stream-0001 --duty "Own the implementation route"
+structure-rule executive-report --office CFO --stream stream-0001 --summary "Token budget is stable."
+```
+
 The sync report is written to:
 
 ```text
@@ -518,6 +527,43 @@ structure-rule human-takeover stream-0001 --reason "Manual review before remote 
 This is the backend runtime layer that sits above Git, Context Git, worknet
 objects, governance, and model API packets.
 
+### 1.4.1 Executive Layer
+
+The 1.4.1 patch adds an executive board below the CEO agent. The CEO can appoint
+specialized executive offices while P13 remains the final supervisor.
+
+Default offices:
+
+- `COO`: operations, stream progress, issue/project flow, delivery cadence
+- `CTO`: architecture, implementation routes, verification, technical risk
+- `CFO`: token budget, model/API cost, resource usage, budget reporting
+- `CSO`: governance, sandbox, secrets, permission risk
+- `CRO`: research routes, evidence quality, knowledge capture
+
+Executive state is stored under:
+
+```text
+structure/worknet/runtime/executives/
+├── executive_board.json
+├── appointments/
+│   └── appointment-0001-cto.json
+└── reports/
+    └── cfo-report-0001.json
+```
+
+Useful commands:
+
+```bash
+structure-rule executive-board
+structure-rule executive-board --office CTO
+structure-rule executive-appoint --office CTO --subagent subagent-0002 --by subagent-0001
+structure-rule executive-delegate --office CTO --stream stream-0001 --duty "Own implementation route."
+structure-rule executive-report --office CFO --stream stream-0001 --summary "Budget stable."
+```
+
+`executive-appoint` requires a `P12` CEO agent or a `P13` human supervisor.
+Executives can own delegated stream duties, but they do not override P13 gates.
+
 ## Local Network Model
 
 Agent GitHub Worknet stores local collaboration objects under:
@@ -555,6 +601,7 @@ Model-agent actions also pass through governance checks:
 - live model API calls require `model-call --apply` and a matching token
 - stream runtime authority is expressed through P1-P13 corporate levels
 - P12 CEO agents still cannot override P13 human gates
+- executive appointments require a P12 CEO agent or P13 human supervisor
 
 Duplicate protection is built in:
 
@@ -610,12 +657,12 @@ the path toward the 1.0 closure release.
 Current stable version:
 
 ```text
-1.4.0
+1.4.1
 ```
 
-The 1.4 release adds the stream runtime backend: P1-P13 corporate roles, CEO
-agent planning, human supervisor takeover, stream events, assignments, runtime
-status, and append-only runtime logs.
+The 1.4.1 release adds the executive layer on top of the stream runtime:
+COO/CTO/CFO/CSO/CRO offices, CEO appointments, executive delegation, executive
+reports, and board status.
 
 ## Philosophy
 

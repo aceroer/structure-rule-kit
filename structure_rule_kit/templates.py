@@ -234,6 +234,16 @@ Add a stream-structured runtime backend:
 - subagent assignments to streams and issues
 - CEO plans and runtime status summaries
 
+## Version 1.4.1
+
+Add an executive layer under the CEO agent:
+
+- COO/CTO/CFO/CSO/CRO executive offices
+- CEO or human supervisor appointments
+- executive delegation to streams and issues
+- executive reports
+- executive board status
+
 ## Deferred Ideas
 
 - Optional project presets, only if they support the scriptable integration layer.

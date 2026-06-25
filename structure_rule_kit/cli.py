@@ -94,6 +94,10 @@ from .runtime import (
     agent_promote,
     assignment_create,
     ceo_plan,
+    executive_appoint,
+    executive_board,
+    executive_delegate,
+    executive_report,
     human_takeover,
     level_allows,
     role_show,
@@ -696,6 +700,34 @@ def main(argv: list[str] | None = None) -> int:
     runtime_status_parser = subparsers.add_parser("runtime-status", help="Show stream runtime status")
     runtime_status_parser.add_argument("--path", default=".")
     runtime_status_parser.add_argument("--json", action="store_true")
+
+    executive_board_parser = subparsers.add_parser("executive-board", help="Show executive offices and appointments")
+    executive_board_parser.add_argument("--path", default=".")
+    executive_board_parser.add_argument("--office", default="")
+    executive_board_parser.add_argument("--json", action="store_true")
+
+    executive_appoint_parser = subparsers.add_parser("executive-appoint", help="Appoint a subagent to an executive office")
+    executive_appoint_parser.add_argument("--path", default=".")
+    executive_appoint_parser.add_argument("--office", required=True)
+    executive_appoint_parser.add_argument("--subagent", required=True)
+    executive_appoint_parser.add_argument("--by", default="")
+    executive_appoint_parser.add_argument("--level", default="")
+    executive_appoint_parser.add_argument("--mandate", default="")
+
+    executive_delegate_parser = subparsers.add_parser("executive-delegate", help="Delegate stream or issue duty to an executive office")
+    executive_delegate_parser.add_argument("--path", default=".")
+    executive_delegate_parser.add_argument("--office", required=True)
+    executive_delegate_parser.add_argument("--stream", default="")
+    executive_delegate_parser.add_argument("--issue", default="")
+    executive_delegate_parser.add_argument("--duty", default="")
+    executive_delegate_parser.add_argument("--by", default="")
+
+    executive_report_parser = subparsers.add_parser("executive-report", help="Write an executive office report")
+    executive_report_parser.add_argument("--path", default=".")
+    executive_report_parser.add_argument("--office", required=True)
+    executive_report_parser.add_argument("--stream", default="")
+    executive_report_parser.add_argument("--summary", default="")
+    executive_report_parser.add_argument("--by", default="")
 
     args = parser.parse_args(argv)
 
@@ -1580,9 +1612,71 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Streams: {report['streams']}")
             print(f"Assignments: {report['assignments']}")
             print(f"CEO plans: {report['ceo_plans']}")
+            print(f"Executive appointments: {report['executive_appointments']}")
+            print(f"Executive reports: {report['executive_reports']}")
             if report["current"]:
                 print(f"Current stream: {report['current'].get('stream')} ({report['current'].get('state')})")
         return 0 if report["ready"] else 1
+
+    if args.command == "executive-board":
+        report = executive_board(args.path, office=args.office)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        elif args.office:
+            appointment = report.get("appointment") or {}
+            definition = report["definition"]
+            print(f"{report['office']}: {definition['title']}")
+            print(definition["domain"])
+            print(f"Appointed: {appointment.get('subagent', 'not appointed')}")
+        else:
+            print(f"Executive board version: {report['version']}")
+            for office, definition in report["offices"].items():
+                appointed = report.get("appointments", {}).get(office, {}).get("subagent", "open")
+                print(f"- {office}: {definition['title']} ({appointed})")
+        return 0
+
+    if args.command == "executive-appoint":
+        try:
+            report = executive_appoint(
+                args.path,
+                office=args.office,
+                subagent=args.subagent,
+                by=args.by,
+                level=args.level,
+                mandate=args.mandate,
+            )
+        except PermissionError as exc:
+            print(str(exc))
+            return 1
+        print(f"Appointed {report['office']} -> {report['payload']['subagent']}: {Path(report['output'])}")
+        return 0
+
+    if args.command == "executive-delegate":
+        try:
+            report = executive_delegate(
+                args.path,
+                office=args.office,
+                stream=args.stream,
+                issue=args.issue,
+                duty=args.duty,
+                by=args.by,
+            )
+        except (PermissionError, ValueError) as exc:
+            print(str(exc))
+            return 1
+        print(f"Delegated {report['office']} via {report['assignment']['id']}")
+        return 0
+
+    if args.command == "executive-report":
+        report = executive_report(
+            args.path,
+            office=args.office,
+            stream=args.stream,
+            summary=args.summary,
+            by=args.by,
+        )
+        print(f"Report {report['id']}: {Path(report['output'])}")
+        return 0
 
     parser.error("Unknown command")
     return 2

@@ -12,6 +12,10 @@ STREAMS_DIR = RUNTIME_DIR / "streams"
 ROLES_DIR = RUNTIME_DIR / "roles"
 ASSIGNMENTS_DIR = RUNTIME_DIR / "assignments"
 CEO_PLANS_DIR = RUNTIME_DIR / "ceo_plans"
+EXECUTIVES_DIR = RUNTIME_DIR / "executives"
+APPOINTMENTS_DIR = EXECUTIVES_DIR / "appointments"
+EXECUTIVE_REPORTS_DIR = EXECUTIVES_DIR / "reports"
+EXECUTIVE_BOARD_FILE = EXECUTIVES_DIR / "executive_board.json"
 CURRENT_STREAM = RUNTIME_DIR / "current_stream.json"
 ROLE_FILE = ROLES_DIR / "corporate_levels.json"
 RUNTIME_LOG = RUNTIME_DIR / "runtime_log.jsonl"
@@ -108,6 +112,47 @@ CORPORATE_LEVELS = {
 }
 
 
+EXECUTIVE_BOARD = {
+    "version": "1.4.1",
+    "rule": "CEO agents may appoint executive offices. P13 human supervisors may override any appointment.",
+    "ceo_level": "P12",
+    "human_supervisor_level": "P13",
+    "offices": {
+        "COO": {
+            "title": "Chief Operating Officer Agent",
+            "default_level": "P11",
+            "domain": "Operations, stream progress, issue/project flow, and delivery cadence.",
+            "capabilities": ["stream_operations", "issue_project_routing", "delivery_tracking"],
+        },
+        "CTO": {
+            "title": "Chief Technology Officer Agent",
+            "default_level": "P11",
+            "domain": "Architecture, implementation routes, verification strategy, and technical risk.",
+            "capabilities": ["architecture_review", "implementation_route", "verification_strategy"],
+        },
+        "CFO": {
+            "title": "Chief Financial Officer Agent",
+            "default_level": "P10",
+            "domain": "Token budget, model/API cost, resource use, and usage reporting.",
+            "capabilities": ["cost_tracking", "token_budgeting", "resource_reporting"],
+        },
+        "CSO": {
+            "title": "Chief Security Officer Agent",
+            "default_level": "P11",
+            "domain": "Governance, sandbox, secret exposure, and permission risk.",
+            "capabilities": ["security_review", "sandbox_policy", "secret_risk_review"],
+        },
+        "CRO": {
+            "title": "Chief Research Officer Agent",
+            "default_level": "P10",
+            "domain": "Research routes, evidence quality, knowledge capture, and open questions.",
+            "capabilities": ["research_route", "evidence_review", "knowledge_capture"],
+        },
+    },
+    "appointments": {},
+}
+
+
 def _root(path: str = ".") -> Path:
     return Path(path)
 
@@ -137,18 +182,32 @@ def _next_record_id(directory: Path, prefix: str, suffix: str) -> str:
 def runtime_init(path: str = ".", force: bool = False) -> dict:
     governance_init(path)
     root = _root(path)
-    for directory in [root / RUNTIME_DIR, root / STREAMS_DIR, root / ROLES_DIR, root / ASSIGNMENTS_DIR, root / CEO_PLANS_DIR]:
+    for directory in [
+        root / RUNTIME_DIR,
+        root / STREAMS_DIR,
+        root / ROLES_DIR,
+        root / ASSIGNMENTS_DIR,
+        root / CEO_PLANS_DIR,
+        root / EXECUTIVES_DIR,
+        root / APPOINTMENTS_DIR,
+        root / EXECUTIVE_REPORTS_DIR,
+    ]:
         directory.mkdir(parents=True, exist_ok=True)
     role_path = root / ROLE_FILE
     created_roles = False
     if force or not role_path.exists():
         _write_json(role_path, CORPORATE_LEVELS)
         created_roles = True
+    board_path = root / EXECUTIVE_BOARD_FILE
+    created_board = False
+    if force or not board_path.exists():
+        _write_json(board_path, EXECUTIVE_BOARD)
+        created_board = True
     log_path = root / RUNTIME_LOG
     if not log_path.exists():
         log_path.write_text("", encoding="utf-8")
-    _append_runtime_log(path, "runtime_init", {"roles": str(role_path), "created_roles": created_roles})
-    return {"output": str(root / RUNTIME_DIR), "roles": str(role_path), "created_roles": created_roles}
+    _append_runtime_log(path, "runtime_init", {"roles": str(role_path), "created_roles": created_roles, "executive_board": str(board_path), "created_board": created_board})
+    return {"output": str(root / RUNTIME_DIR), "roles": str(role_path), "executive_board": str(board_path), "created_roles": created_roles, "created_board": created_board}
 
 
 def load_roles(path: str = ".") -> dict:
@@ -163,6 +222,26 @@ def role_show(path: str = ".", level: str = "") -> dict:
     if level:
         return {"version": roles["version"], "level": level, "role": roles["levels"][level]}
     return roles
+
+
+def load_executive_board(path: str = ".") -> dict:
+    board_path = _root(path) / EXECUTIVE_BOARD_FILE
+    if not board_path.exists():
+        runtime_init(path)
+    return json.loads(board_path.read_text(encoding="utf-8"))
+
+
+def executive_board(path: str = ".", office: str = "") -> dict:
+    board = load_executive_board(path)
+    if office:
+        office = office.upper()
+        return {
+            "version": board["version"],
+            "office": office,
+            "definition": board["offices"][office],
+            "appointment": board.get("appointments", {}).get(office, {}),
+        }
+    return board
 
 
 def _load_subagent(path: str, subagent: str) -> tuple[Path, dict]:
@@ -215,6 +294,142 @@ def agent_promote(path: str = ".", subagent: str = "", level: str = "P3", title:
         _write_json(sandbox_path, sandbox)
     _append_runtime_log(path, "agent_promote", {"subagent": subagent, "level": level, "title": payload["corporate_title"]})
     return {"id": subagent, "level": level, "output": str(subagent_path), "payload": payload}
+
+
+def _actor_level(path: str, actor: str) -> str:
+    if not actor or actor.lower() in {"human", "owner", "p13"}:
+        return "P13"
+    _actor_path, actor_payload = _load_subagent(path, actor)
+    return actor_payload.get("corporate_level", "P3")
+
+
+def _can_appoint(path: str, by: str) -> bool:
+    return _level_number(_actor_level(path, by)) >= 12
+
+
+def executive_appoint(
+    path: str = ".",
+    office: str = "",
+    subagent: str = "",
+    by: str = "",
+    level: str = "",
+    mandate: str = "",
+) -> dict:
+    runtime_init(path)
+    office = office.upper()
+    board = load_executive_board(path)
+    if office not in board["offices"]:
+        raise ValueError(f"Unknown executive office: {office}")
+    if not _can_appoint(path, by):
+        raise PermissionError("Executive appointments require a P12 CEO agent or P13 human supervisor.")
+    office_def = board["offices"][office]
+    appointed_level = (level or office_def["default_level"]).upper()
+    promoted = agent_promote(path, subagent=subagent, level=appointed_level, title=office_def["title"])
+    root = _root(path)
+    appointment_root = root / APPOINTMENTS_DIR
+    appointment_id = _next_record_id(appointment_root, "appointment", ".json")
+    payload = {
+        "id": appointment_id,
+        "office": office,
+        "title": office_def["title"],
+        "subagent": subagent,
+        "appointed_by": by or "P13",
+        "level": appointed_level,
+        "mandate": mandate or office_def["domain"],
+        "status": "active",
+        "created_at": _now(),
+        "updated_at": _now(),
+    }
+    output = appointment_root / f"{appointment_id}-{office.lower()}.json"
+    _write_json(output, payload)
+    board.setdefault("appointments", {})[office] = {
+        "appointment": appointment_id,
+        "subagent": subagent,
+        "level": appointed_level,
+        "appointed_by": by or "P13",
+        "mandate": payload["mandate"],
+        "updated_at": _now(),
+    }
+    _write_json(root / EXECUTIVE_BOARD_FILE, board)
+    _append_runtime_log(path, "executive_appoint", {"office": office, "subagent": subagent, "by": by, "appointment": appointment_id})
+    return {"id": appointment_id, "office": office, "output": str(output), "promoted": promoted, "payload": payload}
+
+
+def executive_delegate(
+    path: str = ".",
+    office: str = "",
+    stream: str = "",
+    issue: str = "",
+    duty: str = "",
+    by: str = "",
+) -> dict:
+    runtime_init(path)
+    office = office.upper()
+    board = load_executive_board(path)
+    appointment = board.get("appointments", {}).get(office, {})
+    if not appointment:
+        raise ValueError(f"No active appointment for {office}")
+    if by and not _can_appoint(path, by):
+        raise PermissionError("Executive delegation requires a P12 CEO agent or P13 human supervisor.")
+    assignment = assignment_create(
+        path,
+        subagent=appointment["subagent"],
+        stream=stream,
+        issue=issue,
+        duty=duty or f"{office} owns {board['offices'][office]['domain']}",
+        level=appointment["level"],
+    )
+    if stream:
+        stream_event(
+            path,
+            stream=stream,
+            event_type="executive_delegate",
+            actor=by or "P13",
+            message=f"{office} delegated to {appointment['subagent']}",
+            payload={"assignment": assignment["id"], "office": office},
+        )
+    _append_runtime_log(path, "executive_delegate", {"office": office, "assignment": assignment["id"], "stream": stream, "issue": issue})
+    return {"office": office, "assignment": assignment}
+
+
+def executive_report(
+    path: str = ".",
+    office: str = "",
+    stream: str = "",
+    summary: str = "",
+    by: str = "",
+) -> dict:
+    runtime_init(path)
+    office = office.upper()
+    board = load_executive_board(path)
+    if office not in board["offices"]:
+        raise ValueError(f"Unknown executive office: {office}")
+    appointment = board.get("appointments", {}).get(office, {})
+    report_root = _root(path) / EXECUTIVE_REPORTS_DIR
+    report_id = _next_record_id(report_root, f"{office.lower()}-report", ".json")
+    payload = {
+        "id": report_id,
+        "office": office,
+        "title": board["offices"][office]["title"],
+        "stream": stream,
+        "reported_by": by or appointment.get("subagent", ""),
+        "appointed_subagent": appointment.get("subagent", ""),
+        "summary": summary or "Not specified.",
+        "created_at": _now(),
+    }
+    output = report_root / f"{report_id}.json"
+    _write_json(output, payload)
+    if stream:
+        stream_event(
+            path,
+            stream=stream,
+            event_type="executive_report",
+            actor=payload["reported_by"],
+            message=f"{office} report: {payload['summary']}",
+            payload={"report": str(output), "office": office},
+        )
+    _append_runtime_log(path, "executive_report", {"office": office, "stream": stream, "report": str(output)})
+    return {"id": report_id, "office": office, "output": str(output), "payload": payload}
 
 
 def assignment_create(
@@ -424,6 +639,8 @@ def runtime_status(path: str = ".") -> dict:
     streams = list((root / STREAMS_DIR).glob("*.jsonl"))
     assignments = list((root / ASSIGNMENTS_DIR).glob("*.json"))
     plans = list((root / CEO_PLANS_DIR).glob("*.json"))
+    appointments = list((root / APPOINTMENTS_DIR).glob("*.json"))
+    executive_reports = list((root / EXECUTIVE_REPORTS_DIR).glob("*.json"))
     current_path = root / CURRENT_STREAM
     current = json.loads(current_path.read_text(encoding="utf-8")) if current_path.exists() else None
     log_path = root / RUNTIME_LOG
@@ -433,6 +650,8 @@ def runtime_status(path: str = ".") -> dict:
         "streams": len(streams),
         "assignments": len(assignments),
         "ceo_plans": len(plans),
+        "executive_appointments": len(appointments),
+        "executive_reports": len(executive_reports),
         "current": current,
         "runtime_events": log_events,
         "roles": str(root / ROLE_FILE),
