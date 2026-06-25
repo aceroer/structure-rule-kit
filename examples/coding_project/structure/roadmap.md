@@ -115,6 +115,16 @@ Add agent-native KPI/OKR metrics:
 - Exploration: valuable new routes rather than mechanical repetition
 - scorecards, OKRs, metric events, and metrics status
 
+## Version 1.4.3
+
+Add a roundtable meeting layer:
+
+- append-only meeting terminals for agents and human board members
+- meeting minutes generation
+- weighted voting by explicit weight or actor P-level
+- organization applications
+- P12/P13 organization review gate
+
 ## Deferred Ideas
 
 - Optional presets, only if they support the integration tools.

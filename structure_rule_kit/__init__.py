@@ -101,6 +101,20 @@ from .network import (
 )
 from .rag_index import build_rag_index
 from .repo_map import scan_repo_map
+from .roundtable import (
+    actor_weight,
+    meeting_post,
+    meeting_show,
+    meeting_start,
+    minutes_generate,
+    org_apply,
+    org_review,
+    roundtable_init,
+    roundtable_status,
+    vote_cast,
+    vote_open,
+    vote_tally,
+)
 from .run_task import run_agent_task
 from .runtime import (
     agent_promote,
@@ -138,6 +152,7 @@ __all__ = [
     "approval_grant",
     "approval_request",
     "add_comment",
+    "actor_weight",
     "agent_promote",
     "assign_issue",
     "assignment_create",
@@ -214,6 +229,10 @@ __all__ = [
     "metric_show",
     "metrics_init",
     "metrics_status",
+    "meeting_post",
+    "meeting_show",
+    "meeting_start",
+    "minutes_generate",
     "model_call",
     "model_capability_check",
     "model_config_init",
@@ -221,9 +240,13 @@ __all__ = [
     "model_provider_set",
     "model_request_build",
     "policy_show",
+    "org_apply",
+    "org_review",
     "okr_review",
     "okr_set",
     "role_show",
+    "roundtable_init",
+    "roundtable_status",
     "run_agent_task",
     "runtime_init",
     "runtime_status",
@@ -259,4 +282,7 @@ __all__ = [
     "work_end",
     "work_start",
     "worknet_status",
+    "vote_cast",
+    "vote_open",
+    "vote_tally",
 ]

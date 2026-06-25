@@ -98,6 +98,19 @@ from .network import (
 )
 from .rag_index import build_rag_index
 from .repo_map import scan_repo_map
+from .roundtable import (
+    meeting_post,
+    meeting_show,
+    meeting_start,
+    minutes_generate,
+    org_apply,
+    org_review,
+    roundtable_init,
+    roundtable_status,
+    vote_cast,
+    vote_open,
+    vote_tally,
+)
 from .run_task import run_agent_task
 from .runtime import (
     agent_promote,
@@ -780,6 +793,72 @@ def main(argv: list[str] | None = None) -> int:
     metrics_status_parser = subparsers.add_parser("metrics-status", help="Show agent metrics status")
     metrics_status_parser.add_argument("--path", default=".")
     metrics_status_parser.add_argument("--json", action="store_true")
+
+    roundtable_init_parser = subparsers.add_parser("roundtable-init", help="Initialize roundtable meeting layer")
+    roundtable_init_parser.add_argument("--path", default=".")
+    roundtable_init_parser.add_argument("--force", action="store_true")
+
+    meeting_start_parser = subparsers.add_parser("meeting-start", help="Start a roundtable meeting terminal")
+    meeting_start_parser.add_argument("--path", default=".")
+    meeting_start_parser.add_argument("--topic", default="")
+    meeting_start_parser.add_argument("--stream", default="")
+    meeting_start_parser.add_argument("--organizer", default="human")
+    meeting_start_parser.add_argument("--agenda", default="")
+
+    meeting_post_parser = subparsers.add_parser("meeting-post", help="Post a message into a roundtable meeting")
+    meeting_post_parser.add_argument("meeting")
+    meeting_post_parser.add_argument("--path", default=".")
+    meeting_post_parser.add_argument("--actor", default="")
+    meeting_post_parser.add_argument("--role", default="")
+    meeting_post_parser.add_argument("--message", default="")
+
+    meeting_show_parser = subparsers.add_parser("meeting-show", help="Show roundtable meeting terminal events")
+    meeting_show_parser.add_argument("meeting")
+    meeting_show_parser.add_argument("--path", default=".")
+    meeting_show_parser.add_argument("--json", action="store_true")
+
+    minutes_parser = subparsers.add_parser("minutes-generate", help="Generate meeting minutes")
+    minutes_parser.add_argument("meeting")
+    minutes_parser.add_argument("--path", default=".")
+
+    vote_open_parser = subparsers.add_parser("vote-open", help="Open a weighted roundtable vote")
+    vote_open_parser.add_argument("--path", default=".")
+    vote_open_parser.add_argument("--meeting", required=True)
+    vote_open_parser.add_argument("--motion", default="")
+    vote_open_parser.add_argument("--by", default="")
+
+    vote_cast_parser = subparsers.add_parser("vote-cast", help="Cast a weighted vote")
+    vote_cast_parser.add_argument("vote")
+    vote_cast_parser.add_argument("--path", default=".")
+    vote_cast_parser.add_argument("--voter", default="")
+    vote_cast_parser.add_argument("--choice", required=True)
+    vote_cast_parser.add_argument("--weight", type=float, default=None)
+    vote_cast_parser.add_argument("--reason", default="")
+
+    vote_tally_parser = subparsers.add_parser("vote-tally", help="Tally a weighted vote")
+    vote_tally_parser.add_argument("vote")
+    vote_tally_parser.add_argument("--path", default=".")
+    vote_tally_parser.add_argument("--close", action="store_true")
+    vote_tally_parser.add_argument("--json", action="store_true")
+
+    org_apply_parser = subparsers.add_parser("org-apply", help="Submit an organization application")
+    org_apply_parser.add_argument("--path", default=".")
+    org_apply_parser.add_argument("--applicant", default="")
+    org_apply_parser.add_argument("--kind", default="")
+    org_apply_parser.add_argument("--target", default="")
+    org_apply_parser.add_argument("--justification", default="")
+    org_apply_parser.add_argument("--meeting", default="")
+
+    org_review_parser = subparsers.add_parser("org-review", help="Review an organization application")
+    org_review_parser.add_argument("application")
+    org_review_parser.add_argument("--path", default=".")
+    org_review_parser.add_argument("--decision", required=True)
+    org_review_parser.add_argument("--reviewer", default="")
+    org_review_parser.add_argument("--notes", default="")
+
+    roundtable_status_parser = subparsers.add_parser("roundtable-status", help="Show roundtable status")
+    roundtable_status_parser.add_argument("--path", default=".")
+    roundtable_status_parser.add_argument("--json", action="store_true")
 
     args = parser.parse_args(argv)
 
@@ -1813,6 +1892,103 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Metric events: {report['metric_events']}")
             print(f"Scorecards: {report['scorecards']}")
             print(f"OKRs: {report['okrs']}")
+        return 0 if report["ready"] else 1
+
+    if args.command == "roundtable-init":
+        report = roundtable_init(args.path, force=args.force)
+        print(f"Roundtable: {Path(report['output'])}")
+        print(f"Rules: {Path(report['rules'])}")
+        return 0
+
+    if args.command == "meeting-start":
+        report = meeting_start(
+            args.path,
+            topic=args.topic,
+            stream=args.stream,
+            organizer=args.organizer,
+            agenda=args.agenda,
+        )
+        print(f"Meeting {report['id']}: {Path(report['output'])}")
+        return 0
+
+    if args.command == "meeting-post":
+        report = meeting_post(args.path, meeting=args.meeting, actor=args.actor, role=args.role, message=args.message)
+        print(f"Posted {report['event']['event_id']} to {report['meeting']}")
+        return 0
+
+    if args.command == "meeting-show":
+        report = meeting_show(args.path, meeting=args.meeting)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print(f"Meeting: {report['meeting']}")
+            print(f"Events: {report['count']}")
+            for event in report["events"]:
+                actor = event.get("actor") or event.get("organizer") or event.get("voter") or ""
+                print(f"- {event['event_id']} {event['type']} {actor}: {event.get('message', event.get('motion', ''))}")
+        return 0
+
+    if args.command == "minutes-generate":
+        report = minutes_generate(args.path, meeting=args.meeting)
+        print(f"Minutes {report['id']}: {Path(report['output'])}")
+        return 0
+
+    if args.command == "vote-open":
+        report = vote_open(args.path, meeting=args.meeting, motion=args.motion, by=args.by)
+        print(f"Vote {report['id']}: {Path(report['output'])}")
+        return 0
+
+    if args.command == "vote-cast":
+        try:
+            report = vote_cast(args.path, vote=args.vote, voter=args.voter, choice=args.choice, weight=args.weight, reason=args.reason)
+        except ValueError as exc:
+            print(str(exc))
+            return 1
+        print(f"Vote cast by {report['record']['voter']} with weight {report['record']['weight']}")
+        return 0
+
+    if args.command == "vote-tally":
+        report = vote_tally(args.path, vote=args.vote, close=args.close)
+        if args.json:
+            print(json.dumps(report["tally"], indent=2))
+        else:
+            print("PASSED" if report["tally"]["passed"] else "FAILED")
+            print(f"Yes: {report['tally']['totals']['yes']}")
+            print(f"No: {report['tally']['totals']['no']}")
+            print(f"Abstain: {report['tally']['totals']['abstain']}")
+        return 0
+
+    if args.command == "org-apply":
+        report = org_apply(
+            args.path,
+            applicant=args.applicant,
+            kind=args.kind,
+            target=args.target,
+            justification=args.justification,
+            meeting=args.meeting,
+        )
+        print(f"Application {report['id']}: {Path(report['output'])}")
+        return 0
+
+    if args.command == "org-review":
+        try:
+            report = org_review(args.path, application=args.application, decision=args.decision, reviewer=args.reviewer, notes=args.notes)
+        except (PermissionError, ValueError) as exc:
+            print(str(exc))
+            return 1
+        print(f"{report['review']['decision'].upper()}: {args.application}")
+        return 0
+
+    if args.command == "roundtable-status":
+        report = roundtable_status(args.path)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print("READY" if report["ready"] else "NEEDS SETUP")
+            print(f"Meetings: {report['meetings']}")
+            print(f"Minutes: {report['minutes']}")
+            print(f"Votes: {report['votes']}")
+            print(f"Applications: {report['applications']}")
         return 0 if report["ready"] else 1
 
     parser.error("Unknown command")

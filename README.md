@@ -182,6 +182,20 @@ structure-rule okr-set --agent subagent-0001 --objective "Improve useful explora
 structure-rule okr-review okr-0001
 ```
 
+Open a roundtable meeting for agents and human board members:
+
+```bash
+structure-rule roundtable-init
+structure-rule meeting-start --topic "Route review" --stream stream-0001 --organizer subagent-0001
+structure-rule meeting-post meeting-0001 --actor subagent-0002 --message "I propose a scoped route."
+structure-rule vote-open --meeting meeting-0001 --motion "Adopt scoped route."
+structure-rule vote-cast vote-0001 --voter subagent-0001 --choice yes
+structure-rule vote-tally vote-0001 --close
+structure-rule org-apply --applicant subagent-0002 --kind promotion --target P7 --meeting meeting-0001
+structure-rule org-review application-0001 --decision approved --reviewer subagent-0001
+structure-rule minutes-generate meeting-0001
+```
+
 The sync report is written to:
 
 ```text
@@ -624,6 +638,74 @@ structure-rule metrics-status
 Scores use a 0-5 scale and are evidence-backed. OKRs target the agent behavior
 metrics directly rather than external business numbers.
 
+### 1.4.3 Roundtable Layer
+
+The 1.4.3 patch adds a roundtable meeting mechanism for agents and human board
+members. It is still backend-first: every meeting is an append-only terminal,
+not a dashboard.
+
+It provides three special mechanisms:
+
+- meeting minutes generation
+- weighted voting
+- organization application and review
+
+Roundtable state is stored under:
+
+```text
+structure/worknet/runtime/roundtable/
+├── roundtable_rules.json
+├── meetings/
+│   └── meeting-0001.jsonl
+├── minutes/
+│   └── minutes-0001-meeting-0001.json
+├── votes/
+│   └── vote-0001.json
+├── applications/
+│   └── application-0001.json
+└── roundtable_log.jsonl
+```
+
+Meeting terminal commands:
+
+```bash
+structure-rule roundtable-init
+structure-rule meeting-start --topic "Architecture review" --stream stream-0001
+structure-rule meeting-post meeting-0001 --actor subagent-0001 --role CTO --message "Use the scoped route."
+structure-rule meeting-show meeting-0001
+structure-rule minutes-generate meeting-0001
+```
+
+Weighted voting commands:
+
+```bash
+structure-rule vote-open --meeting meeting-0001 --motion "Adopt scoped route."
+structure-rule vote-cast vote-0001 --voter subagent-0001 --choice yes
+structure-rule vote-cast vote-0001 --voter subagent-0002 --choice no --weight 3
+structure-rule vote-tally vote-0001 --close
+```
+
+When no explicit weight is supplied, voting uses actor authority:
+
+- `P13` / human: 13
+- `P12` CEO: 12
+- lower P-level agents: their P number
+
+Organization application commands:
+
+```bash
+structure-rule org-apply \
+  --applicant subagent-0002 \
+  --kind promotion \
+  --target P7 \
+  --justification "Needs scoped source edit responsibility." \
+  --meeting meeting-0001
+structure-rule org-review application-0001 --decision approved --reviewer subagent-0001
+structure-rule roundtable-status
+```
+
+`org-review` requires a P12 CEO agent or P13 human supervisor.
+
 ## Local Network Model
 
 Agent GitHub Worknet stores local collaboration objects under:
@@ -663,6 +745,8 @@ Model-agent actions also pass through governance checks:
 - P12 CEO agents still cannot override P13 human gates
 - executive appointments require a P12 CEO agent or P13 human supervisor
 - agent metrics are evidence-backed stream records, not hidden model judgments
+- roundtable organization reviews require a P12 CEO agent or P13 human supervisor
+- weighted votes use explicit weights or actor P-level authority
 
 Duplicate protection is built in:
 
@@ -718,12 +802,12 @@ the path toward the 1.0 closure release.
 Current stable version:
 
 ```text
-1.4.2
+1.4.3
 ```
 
-The 1.4.2 release adds agent-native KPI/OKR metrics: Reliability, Delegation,
-Coordination, Correction, Exploration, scorecards, OKRs, metric events, and
-metrics status.
+The 1.4.3 release adds roundtable meetings: append-only meeting terminals,
+meeting minutes generation, weighted voting, organization applications, and
+P12/P13 review gates.
 
 ## Philosophy
 
