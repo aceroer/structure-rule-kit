@@ -189,6 +189,17 @@ Close the first Agent GitHub Worknet loop:
 - local worknet status classification
 - sync report generation
 
+## Version 1.1
+
+Add agent workflow commands:
+
+- GitHub repo auto-detection
+- GitHub issue comments
+- task-from-issue and issue-from-task binding
+- work-start and work-end sessions
+- verification-aware work endings
+- worknet status summaries
+
 ## Deferred Ideas
 
 - Optional project presets, only if they support the scriptable integration layer.

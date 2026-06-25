@@ -5,6 +5,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
+from urllib.parse import urlparse
 
 from .network import _append_log, _ensure_network, _find_item, _load_items, _now, _write_json
 
@@ -47,8 +48,14 @@ def write_github_config(
     repo: str = "",
     output: str = str(GITHUB_CONFIG),
     force: bool = False,
+    auto: bool = False,
+    runner=None,
 ) -> dict:
     root = _ensure_network(path)
+    if auto and not repo:
+        detected = infer_github_repo(path, runner=runner)
+        if detected["ok"]:
+            repo = detected["repo"]
     output_path = Path(path) / output
     if output_path.exists() and not force:
         return {"output": str(output_path), "created": False, "config": load_github_config(path, output)}
@@ -67,6 +74,27 @@ def load_github_config(path: str = ".", config: str = str(GITHUB_CONFIG)) -> dic
 
 def _resolve_repo(path: str, repo: str = "", config: str = str(GITHUB_CONFIG)) -> str:
     return repo or load_github_config(path, config).get("repo", "")
+
+
+def infer_github_repo(path: str = ".", remote: str = "origin", runner=None) -> dict:
+    command = ["git", "remote", "get-url", remote]
+    run = runner or subprocess.run
+    result = run(command, cwd=Path(path), capture_output=True, text=True)
+    if result.returncode != 0:
+        return {"ok": False, "repo": "", "remote": remote, "error": result.stderr.strip(), "command": command}
+    url = result.stdout.strip()
+    repo = _repo_from_remote_url(url)
+    return {"ok": bool(repo), "repo": repo, "remote": remote, "url": url, "command": command}
+
+
+def _repo_from_remote_url(url: str) -> str:
+    value = url.strip()
+    if value.startswith("git@github.com:"):
+        return value.removeprefix("git@github.com:").removesuffix(".git")
+    if "github.com" in value:
+        parsed = urlparse(value)
+        return parsed.path.strip("/").removesuffix(".git")
+    return ""
 
 
 def _clean_item(payload: dict) -> dict:
@@ -456,6 +484,36 @@ def github_issue_create(
     _write_json(issue_path, payload)
     _append_log(root, "github_issue_create", {"id": issue, "repo": repo, "url": url, "number": number})
     return {"ok": True, "status": "created", "id": issue, "repo": repo, "url": url, "number": number}
+
+
+def github_comment(
+    path: str = ".",
+    issue: str = "",
+    body: str = "",
+    repo: str = "",
+    apply: bool = False,
+    runner=None,
+) -> dict:
+    root = _ensure_network(path)
+    issue_path, payload = _find_item(root, "issues", issue)
+    remote = payload.get("remote") or {}
+    repo = repo or remote.get("repo") or _resolve_repo(path)
+    number = remote.get("number")
+    if not repo:
+        return {"ok": False, "status": "missing-repo", "message": "--repo, issue remote repo, or github_config repo is required."}
+    if not number:
+        return {"ok": False, "status": "missing-remote", "message": "Local issue has no remote issue number."}
+    command = ["gh", "issue", "comment", str(number), "--repo", repo, "--body", body.strip() or "Not specified."]
+    if not apply:
+        return {"ok": True, "status": "dry-run", "id": issue, "repo": repo, "number": number, "command": command}
+    result = _run_gh(command, runner=runner)
+    if result.returncode != 0:
+        return {"ok": False, "status": "failed", "id": issue, "stderr": result.stderr, "command": command}
+    payload["last_github_comment_at"] = _now()
+    payload["updated_at"] = _now()
+    _write_json(issue_path, payload)
+    _append_log(root, "github_comment", {"id": issue, "repo": repo, "number": number})
+    return {"ok": True, "status": "commented", "id": issue, "repo": repo, "number": number}
 
 
 def github_issues_create(

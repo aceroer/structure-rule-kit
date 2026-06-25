@@ -30,6 +30,7 @@ from .github_bridge import (
     export_github_issues,
     export_github_labels,
     export_github_milestones,
+    github_comment,
     github_doctor,
     github_issue_create,
     github_issues_create,
@@ -78,6 +79,7 @@ from .task import create_agent_task
 from .toolbox_audit import audit_toolbox
 from .validator import validate_structure
 from .verify_log import append_verify_log
+from .worknet import issue_from_task, task_from_issue, work_end, work_start, worknet_status
 
 
 def print_summary(summary: dict) -> None:
@@ -442,6 +444,7 @@ def main(argv: list[str] | None = None) -> int:
     github_config_parser.add_argument("--repo", default="")
     github_config_parser.add_argument("--output", default="structure/network/github_config.json")
     github_config_parser.add_argument("--force", action="store_true")
+    github_config_parser.add_argument("--auto", action="store_true")
 
     github_doctor_parser = subparsers.add_parser("github-doctor", help="Check GitHub CLI and repo access")
     github_doctor_parser.add_argument("--path", default=".")
@@ -466,6 +469,43 @@ def main(argv: list[str] | None = None) -> int:
     github_sync_report_parser.add_argument("--path", default=".")
     github_sync_report_parser.add_argument("--repo", default="")
     github_sync_report_parser.add_argument("--output", default="structure/network/github_export/sync_report.md")
+
+    github_comment_parser = subparsers.add_parser("github-comment", help="Comment on a linked GitHub issue")
+    github_comment_parser.add_argument("issue")
+    github_comment_parser.add_argument("--path", default=".")
+    github_comment_parser.add_argument("--repo", default="")
+    github_comment_parser.add_argument("--body", default="")
+    github_comment_parser.add_argument("--apply", action="store_true")
+
+    task_from_issue_parser = subparsers.add_parser("task-from-issue", help="Create an agent task from a local issue")
+    task_from_issue_parser.add_argument("issue")
+    task_from_issue_parser.add_argument("--path", default=".")
+    task_from_issue_parser.add_argument("--output-dir", default="structure/tasks")
+
+    issue_from_task_parser = subparsers.add_parser("issue-from-task", help="Create a local issue from an agent task")
+    issue_from_task_parser.add_argument("task_file")
+    issue_from_task_parser.add_argument("--path", default=".")
+    issue_from_task_parser.add_argument("--label", action="append", default=[])
+
+    work_start_parser = subparsers.add_parser("work-start", help="Start an agent work session for an issue")
+    work_start_parser.add_argument("issue")
+    work_start_parser.add_argument("--path", default=".")
+    work_start_parser.add_argument("--task", default="")
+    work_start_parser.add_argument("--note", default="")
+
+    work_end_parser = subparsers.add_parser("work-end", help="End the current agent work session")
+    work_end_parser.add_argument("--path", default=".")
+    work_end_parser.add_argument("--issue", default="")
+    work_end_parser.add_argument("--done", default="")
+    work_end_parser.add_argument("--next", default="", dest="next_step")
+    work_end_parser.add_argument("--cmd", default="")
+    work_end_parser.add_argument("--run", action="store_true")
+    work_end_parser.add_argument("--github-comment", default="")
+    work_end_parser.add_argument("--apply-comment", action="store_true")
+
+    worknet_status_parser = subparsers.add_parser("worknet-status", help="Show Agent GitHub Worknet status")
+    worknet_status_parser.add_argument("--path", default=".")
+    worknet_status_parser.add_argument("--json", action="store_true")
 
     args = parser.parse_args(argv)
 
@@ -998,7 +1038,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "github-config":
-        report = write_github_config(args.path, repo=args.repo, output=args.output, force=args.force)
+        report = write_github_config(args.path, repo=args.repo, output=args.output, force=args.force, auto=args.auto)
         print(f"{'Wrote' if report['created'] else 'Exists'} {Path(report['output'])}")
         return 0
 
@@ -1040,6 +1080,56 @@ def main(argv: list[str] | None = None) -> int:
         report = github_sync_report(args.path, repo=args.repo, output=args.output)
         print(f"Wrote {Path(report['output'])}")
         return 0
+
+    if args.command == "github-comment":
+        report = github_comment(args.path, issue=args.issue, body=args.body, repo=args.repo, apply=args.apply)
+        if not report["ok"]:
+            print(report.get("message") or "GitHub comment failed.")
+            return 1
+        print(f"{report['status']}: {report['id']}")
+        return 0
+
+    if args.command == "task-from-issue":
+        report = task_from_issue(args.path, issue=args.issue, output_dir=args.output_dir)
+        print(f"Wrote {Path(report['output'])}")
+        return 0
+
+    if args.command == "issue-from-task":
+        report = issue_from_task(args.path, task_file=args.task_file, label=args.label)
+        print(f"Wrote {Path(report['output'])}")
+        return 0
+
+    if args.command == "work-start":
+        report = work_start(args.path, issue=args.issue, task=args.task, note=args.note)
+        print(f"Started {report['issue']}: {Path(report['session'])}")
+        return 0
+
+    if args.command == "work-end":
+        report = work_end(
+            args.path,
+            done=args.done,
+            next_step=args.next_step,
+            command=args.cmd,
+            run=args.run,
+            issue=args.issue,
+            github_comment_body=args.github_comment,
+            apply_comment=args.apply_comment,
+        )
+        print(f"Ended {report['issue'] or 'work session'}")
+        print(f"Report: {Path(report['sync_report'])}")
+        return 0
+
+    if args.command == "worknet-status":
+        report = worknet_status(args.path)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print("READY" if report["ready"] else "NEEDS SETUP")
+            print(f"Repo: {report['repo'] or 'not configured'}")
+            print(f"Issues: {report['issues']}")
+            if report["current"]:
+                print(f"Current: {report['current'].get('issue')}")
+        return 0 if report["ready"] else 1
 
     parser.error("Unknown command")
     return 2

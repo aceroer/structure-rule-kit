@@ -54,6 +54,12 @@ remote metadata write-back and duplicate protection.
 Add Agent GitHub Worknet closure: repo config, doctor checks, label and
 milestone creation, remote state pullback, worknet status, and sync reports.
 
+## Version 1.1
+
+Add agent workflow commands for repo auto-detection, GitHub comments,
+task/issue binding, work sessions, verification-aware endings, and status
+summaries.
+
 ## Deferred Ideas
 
 - Optional presets, only if they support the integration tools.

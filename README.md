@@ -6,8 +6,8 @@ Agent GitHub Worknet lets coding and research agents create, track, sync, and
 reconcile GitHub-like work objects without losing local project structure.
 
 It is built on the `structure-rule-kit` package and the `structure-rule` CLI.
-The package name remains stable for installation and compatibility; the 1.0
-project identity is Agent GitHub Worknet.
+The package name remains stable for installation and compatibility; the project
+identity is Agent GitHub Worknet.
 
 ## What It Does
 
@@ -26,10 +26,10 @@ Agents can edit files, but they also need to know:
 Agent GitHub Worknet gives agents a local work network under `structure/network/`
 and connects it to GitHub through the GitHub CLI.
 
-The 1.0 closure loop is:
+The 1.1 workflow loop is:
 
 ```text
-local issue -> GitHub issue -> remote state -> local status -> sync report
+GitHub repo -> local issue -> agent task -> work session -> verification -> GitHub comment -> sync report
 ```
 
 ## Install
@@ -73,6 +73,7 @@ Configure GitHub:
 
 ```bash
 structure-rule github-config --repo owner/name
+structure-rule github-config --auto
 structure-rule github-doctor
 ```
 
@@ -102,6 +103,15 @@ Run the full issue sync path:
 
 ```bash
 structure-rule github-sync --apply
+```
+
+Start and finish an agent work session:
+
+```bash
+structure-rule task-from-issue issue-0001
+structure-rule work-start issue-0001
+structure-rule work-end --done "Implemented parser" --cmd "python3 -m pytest" --run
+structure-rule worknet-status
 ```
 
 The sync report is written to:
@@ -180,6 +190,64 @@ Report statuses include:
 - `remote-changed`
 - `missing-remote`
 - `local-only`
+
+## 1.1 Agent Workflow Commands
+
+`github-config --auto` detects the GitHub repo from `git remote get-url origin`:
+
+```bash
+structure-rule github-config --auto
+```
+
+`task-from-issue` turns a local issue into an executable agent task:
+
+```bash
+structure-rule task-from-issue issue-0001
+```
+
+`issue-from-task` turns an agent task back into a local issue:
+
+```bash
+structure-rule issue-from-task structure/tasks/20260625-add-parser.md
+```
+
+`work-start` opens a local work session:
+
+```bash
+structure-rule work-start issue-0001
+```
+
+It writes `structure/worknet/current.json` and updates `structure/status.md`.
+
+`work-end` closes the session, records optional verification, refreshes the sync
+report, and can prepare or apply a GitHub comment:
+
+```bash
+structure-rule work-end \
+  --done "Implemented parser" \
+  --next "Review changes" \
+  --cmd "python3 -m pytest" \
+  --run
+
+structure-rule work-end \
+  --done "Implemented parser" \
+  --github-comment "Implemented parser and tests pass." \
+  --apply-comment
+```
+
+`github-comment` comments on a linked GitHub issue:
+
+```bash
+structure-rule github-comment issue-0001 --body "Tests pass."
+structure-rule github-comment issue-0001 --body "Tests pass." --apply
+```
+
+`worknet-status` gives an agent-friendly status summary:
+
+```bash
+structure-rule worknet-status
+structure-rule worknet-status --json
+```
 
 ## Local Network Model
 
@@ -263,12 +331,11 @@ the path toward the 1.0 closure release.
 Current stable version:
 
 ```text
-1.0.0
+1.1.0
 ```
 
-The first real closure smoke test created GitHub issue `#2`, pulled it back into
-local state as `synced`, generated an Agent GitHub Worknet sync report, and then
-closed the temporary issue.
+The 1.1 release adds auto repo configuration, task/issue binding, work sessions,
+verification-aware work endings, GitHub comments, and worknet status output.
 
 ## Philosophy
 

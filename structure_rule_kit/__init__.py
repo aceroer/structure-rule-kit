@@ -26,7 +26,9 @@ from .github_bridge import (
     export_github_issues,
     export_github_labels,
     export_github_milestones,
+    github_comment,
     github_doctor,
+    infer_github_repo,
     github_issue_create,
     github_issues_create,
     github_labels_create,
@@ -77,6 +79,7 @@ from .task import create_agent_task
 from .toolbox_audit import audit_toolbox
 from .validator import validate_structure
 from .verify_log import append_verify_log
+from .worknet import issue_from_task, task_from_issue, work_end, work_start, worknet_status
 
 __all__ = [
     "append_decision_log",
@@ -113,6 +116,8 @@ __all__ = [
     "export_skill",
     "github_export",
     "github_doctor",
+    "github_comment",
+    "infer_github_repo",
     "github_issue_create",
     "github_issues_create",
     "github_labels_create",
@@ -124,6 +129,7 @@ __all__ = [
     "init_context",
     "init_network",
     "init_structure",
+    "issue_from_task",
     "latest_context_snapshot",
     "list_context_snapshots",
     "list_comments",
@@ -145,6 +151,7 @@ __all__ = [
     "sync_agent",
     "sync_network",
     "timeline",
+    "task_from_issue",
     "end_session",
     "ensure_remote_metadata",
     "summarize_structure",
@@ -155,4 +162,7 @@ __all__ = [
     "validate_structure",
     "write_config",
     "write_github_config",
+    "work_end",
+    "work_start",
+    "worknet_status",
 ]

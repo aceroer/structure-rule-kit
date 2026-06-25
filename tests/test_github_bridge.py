@@ -11,6 +11,7 @@ from structure_rule_kit import (
     export_github_issues,
     export_github_labels,
     export_github_milestones,
+    github_comment,
     github_doctor,
     github_issue_create,
     github_issues_create,
@@ -19,8 +20,14 @@ from structure_rule_kit import (
     github_pull,
     github_sync,
     github_sync_report,
+    infer_github_repo,
     init_structure,
+    issue_from_task,
     load_github_config,
+    task_from_issue,
+    work_end,
+    work_start,
+    worknet_status,
     write_github_config,
 )
 from structure_rule_kit.cli import main
@@ -110,6 +117,8 @@ def mock_gh(labels=None, issue_url="https://github.com/aceroer/example/issues/17
             return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
         if command[:3] == ["gh", "issue", "create"]:
             return subprocess.CompletedProcess(command, 0, stdout=f"{issue_url}\n", stderr="")
+        if command[:3] == ["gh", "issue", "comment"]:
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
         if command[:3] == ["gh", "issue", "view"]:
             payload = {
                 "number": int(command[3]),
@@ -136,6 +145,15 @@ def mock_gh(labels=None, issue_url="https://github.com/aceroer/example/issues/17
         return subprocess.CompletedProcess(command, 1, stdout="", stderr="unexpected command")
 
     runner.calls = calls
+    return runner
+
+
+def mock_git_remote(url="https://github.com/aceroer/Agent-GitHub-Worknet.git"):
+    def runner(command, cwd=None, capture_output=True, text=True):
+        if command == ["git", "remote", "get-url", "origin"]:
+            return subprocess.CompletedProcess(command, 0, stdout=f"{url}\n", stderr="")
+        return subprocess.CompletedProcess(command, 1, stdout="", stderr="unexpected command")
+
     return runner
 
 
@@ -201,6 +219,15 @@ def test_github_config_and_repo_resolution(tmp_path):
     assert report["repo"] == "aceroer/example"
 
 
+def test_github_config_auto_detects_repo(tmp_path):
+    seed_network(tmp_path)
+    detected = infer_github_repo(str(tmp_path), runner=mock_git_remote("git@github.com:aceroer/Agent-GitHub-Worknet.git"))
+    config = write_github_config(str(tmp_path), auto=True, runner=mock_git_remote())
+
+    assert detected["repo"] == "aceroer/Agent-GitHub-Worknet"
+    assert config["config"]["repo"] == "aceroer/Agent-GitHub-Worknet"
+
+
 def test_github_labels_and_milestones_create(tmp_path):
     seed_network(tmp_path)
     labels = github_labels_create(str(tmp_path), repo="aceroer/example", apply=True, runner=mock_gh(labels=[]))
@@ -231,6 +258,46 @@ def test_github_pull_and_sync_report(tmp_path):
     assert "Agent GitHub Worknet Sync Report" in text
 
 
+def test_github_comment(tmp_path):
+    seed_network(tmp_path)
+    github_issue_create(
+        str(tmp_path),
+        issue="issue-0001",
+        repo="aceroer/example",
+        apply=True,
+        runner=mock_gh(issue_url="https://github.com/aceroer/example/issues/42"),
+    )
+    dry = github_comment(str(tmp_path), issue="issue-0001", body="Done", runner=mock_gh())
+    applied = github_comment(str(tmp_path), issue="issue-0001", body="Done", apply=True, runner=mock_gh())
+
+    assert dry["status"] == "dry-run"
+    assert applied["status"] == "commented"
+
+
+def test_task_issue_binding_and_work_session(tmp_path):
+    seed_network(tmp_path)
+    write_github_config(str(tmp_path), repo="aceroer/example")
+    task = task_from_issue(str(tmp_path), "issue-0001")
+    issue = issue_from_task(str(tmp_path), task["output"])
+    start = work_start(str(tmp_path), "issue-0001", task=task["output"])
+    assert Path(start["session"]).exists()
+    end = work_end(
+        str(tmp_path),
+        done="Implemented worknet flow.",
+        next_step="Review output.",
+        command="python3 -c 'print(123)'",
+        run=True,
+    )
+    status = worknet_status(str(tmp_path))
+
+    assert Path(task["output"]).exists()
+    assert issue["issue"] == "issue-0003"
+    assert not Path(start["session"]).exists()
+    assert end["verification"]["exit_code"] == 0
+    assert status["ready"] is True
+    assert status["issues"] == 3
+
+
 def test_github_doctor_with_runner(tmp_path, monkeypatch):
     monkeypatch.setattr("structure_rule_kit.github_bridge.shutil.which", lambda name: "/usr/bin/gh")
     report = github_doctor(str(tmp_path), repo="aceroer/example", runner=mock_gh())
@@ -244,3 +311,12 @@ def test_github_closure_cli_commands(tmp_path, monkeypatch):
     monkeypatch.setattr("structure_rule_kit.github_bridge.shutil.which", lambda name: "/usr/bin/gh")
     assert main(["github-config", "--path", str(tmp_path), "--repo", "aceroer/example"]) == 0
     assert main(["github-sync-report", "--path", str(tmp_path)]) == 0
+
+
+def test_worknet_cli_commands(tmp_path):
+    seed_network(tmp_path)
+    assert main(["github-config", "--path", str(tmp_path), "--repo", "aceroer/example", "--force"]) == 0
+    assert main(["task-from-issue", "issue-0001", "--path", str(tmp_path)]) == 0
+    assert main(["work-start", "issue-0001", "--path", str(tmp_path)]) == 0
+    assert main(["work-end", "--path", str(tmp_path), "--done", "Finished.", "--next", "Review."]) == 0
+    assert main(["worknet-status", "--path", str(tmp_path)]) == 0
