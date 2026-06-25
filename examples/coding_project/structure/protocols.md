@@ -45,6 +45,43 @@ Authority is explicit and recorded:
 
 When authority is unclear, pause the action and record the uncertainty.
 
+
+## Role Protocol
+
+P-levels define what an agent is expected to do and what it must not do without a higher gate:
+
+| Level | Role | Primary Work | Boundary |
+| --- | --- | --- | --- |
+| P1 | Observer Intern | Read local context and report what exists. | No writes, no commands beyond passive reading. |
+| P2 | Summarizer | Summarize structure files, issues, streams, meetings, and handoffs. | No planning authority beyond summaries. |
+| P3 | Draft Assistant | Create local plans, task drafts, notes, and proposed routes. | Draft only; no source edits. |
+| P4 | Sandbox Worker | Edit approved sandbox, worknet, task, and draft files. | No source tree changes outside allowed paths. |
+| P5 | Read Command Worker | Run read-only inspection commands and gather evidence. | No verification, write, remote, or model-live actions. |
+| P6 | Verification Worker | Run approved verification commands and record results. | No source edits unless separately authorized. |
+| P7 | Scoped Implementer | Prepare scoped source edits after approval. | No broad refactors, remote writes, or policy changes. |
+| P8 | Worknet Operator | Create and update local issues, PRs, milestones, boards, and worknet records. | Local worknet only unless remote action is approved. |
+| P9 | Lead Agent | Coordinate multiple subagents and merge local evidence. | Cannot bypass approval gates or human takeover. |
+| P10 | Manager Agent | Approve low-risk local execution inside policy and review agent output. | Cannot grant external or high-risk capability alone. |
+| P11 | Remote Action Preparer | Prepare GitHub, publication, or external actions for approval. | Preparation only; remote writes still require explicit gates. |
+| P12 | CEO Agent | Global planning, delegation, stream routing, executive appointment, and escalation. | Cannot override P13 human gates. |
+| P13 | Human Supervisor | Final ownership, approval, revocation, takeover, and redirection. | Human policy is the top local authority. |
+
+A lower level may assist a higher level only inside its own boundary. Promotion changes must be recorded through organization application, executive appointment, or explicit human action.
+
+## Executive Office Protocol
+
+Executive offices are specialized P-level roles below P13. They describe responsibility, not ownership:
+
+| Office | Default Level | Responsibility | Required Output |
+| --- | --- | --- | --- |
+| COO | P11 | Operations, stream progress, issue/project flow, delivery cadence. | Delegation records, progress reports, blocker summaries. |
+| CTO | P11 | Architecture, implementation route, verification strategy, technical risk. | Technical route, review notes, verification plan. |
+| CFO | P10 | Token budget, model/API cost, resource usage, budget reporting. | Cost notes, budget warnings, resource reports. |
+| CSO | P11 | Governance, sandbox, secrets, permissions, remote-write risk. | Security review, sandbox decision, secret-risk report. |
+| CRO | P10 | Research route, evidence quality, knowledge capture, open questions. | Research memo, evidence map, unresolved question list. |
+
+Executives can be delegated work on streams or issues. They can recommend decisions, but appointments, organization changes, high-risk actions, and remote writes remain gated by P12/P13 rules.
+
 ## Workflow Protocol
 
 The default work flow is:

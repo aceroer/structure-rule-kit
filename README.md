@@ -908,12 +908,11 @@ the path toward the 1.0 closure release.
 Current stable version:
 
 ```text
-1.5.0
+1.5.1
 ```
 
-The 1.5.0 release adds a standard MCP server entry, security hardening for
-sandbox, commands, secrets, and tokens, plus CI, lint, type-check, coverage, and
-build packaging infrastructure.
+The 1.5.1 release fixes role rules into `structure/protocols.md`: P1-P13
+responsibilities, boundaries, executive office duties, and required outputs.
 
 ## Philosophy
 
