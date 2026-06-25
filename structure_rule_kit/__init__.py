@@ -57,6 +57,16 @@ from .handoff import build_handoff_pack
 from .mcp_manifest import build_mcp_manifest
 from .mcp_scaffold import scaffold_mcp
 from .mcp_server import list_resources, read_resource, run_server
+from .model_api import (
+    build_model_messages,
+    load_model_providers,
+    model_call,
+    model_capability_check,
+    model_config_init,
+    model_doctor,
+    model_provider_set,
+    model_request_build,
+)
 from .network import (
     add_comment,
     assign_issue,
@@ -107,6 +117,7 @@ __all__ = [
     "build_handoff_pack",
     "build_github_sync_plan",
     "build_mcp_manifest",
+    "build_model_messages",
     "build_project_board",
     "build_rag_index",
     "audit_toolbox",
@@ -156,9 +167,16 @@ __all__ = [
     "list_milestones",
     "list_resources",
     "load_github_config",
+    "load_model_providers",
     "load_policy",
     "load_config",
     "merge_pr",
+    "model_call",
+    "model_capability_check",
+    "model_config_init",
+    "model_doctor",
+    "model_provider_set",
+    "model_request_build",
     "policy_show",
     "run_agent_task",
     "run_server",

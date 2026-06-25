@@ -38,6 +38,12 @@ The 1.2 governance loop adds a safe shell around future model agents:
 issue -> subagent plan -> governed subagent -> sandbox check -> command check -> approval -> capability token
 ```
 
+The 1.3 model API loop adds a real provider boundary:
+
+```text
+provider config -> doctor -> request packet -> dry-run -> approval token -> live model call
+```
+
 ## Install
 
 ```bash
@@ -128,6 +134,16 @@ structure-rule subagent-plan issue-0001
 structure-rule subagent-create --permission draft --issue issue-0001
 structure-rule sandbox-check subagent-0001 --target structure/tasks/task.md
 structure-rule command-check --subagent subagent-0001 --cmd "rg TODO"
+```
+
+Prepare a real model API provider:
+
+```bash
+structure-rule model-config
+structure-rule model-provider-set --provider openai --model "$MODEL_NAME"
+structure-rule model-doctor
+structure-rule model-request --prompt "Plan the next step." --subagent subagent-0001
+structure-rule model-call model-request-0001
 ```
 
 The sync report is written to:
@@ -333,6 +349,72 @@ structure-rule approval-grant approval-0001
 This layer does not call a model API yet. It exists so later model agents have a
 clear permission boundary before they can plan, draft, verify, or apply work.
 
+## 1.3 Model API Commands
+
+The 1.3 layer prepares real model API use while preserving the governance
+boundary from 1.2. It stores provider config, request packets, response records,
+and API audit events under:
+
+```text
+structure/worknet/model_api/
+├── providers.json
+├── model_api_log.jsonl
+├── requests/
+└── responses/
+```
+
+`model-config` initializes provider config:
+
+```bash
+structure-rule model-config
+structure-rule model-config --json
+```
+
+`model-provider-set` records endpoint, API-key environment variable, provider
+type, and model name:
+
+```bash
+structure-rule model-provider-set \
+  --provider openai \
+  --api-key-env OPENAI_API_KEY \
+  --model "$MODEL_NAME"
+```
+
+`model-doctor` checks whether the provider is ready for a live call:
+
+```bash
+structure-rule model-doctor
+structure-rule model-doctor --json
+```
+
+`model-request` builds a request packet from a prompt, issue, and subagent:
+
+```bash
+structure-rule model-request \
+  --issue issue-0001 \
+  --subagent subagent-0001 \
+  --prompt "Draft a task split."
+```
+
+`model-call` defaults to dry-run:
+
+```bash
+structure-rule model-call model-request-0001
+```
+
+A live call requires both `--apply` and a matching capability token:
+
+```bash
+structure-rule approval-request subagent-0001 --action model-call --target openai
+structure-rule approval-grant approval-0001
+structure-rule model-capability-check --subagent subagent-0001 --provider openai
+structure-rule model-call model-request-0001 --apply
+```
+
+This version supports OpenAI-compatible chat-completions style providers through
+standard HTTPS calls and keeps the default model unset until the project owner
+chooses one.
+
 ## Local Network Model
 
 Agent GitHub Worknet stores local collaboration objects under:
@@ -367,6 +449,7 @@ Model-agent actions also pass through governance checks:
 - shell commands go through `command-check`
 - apply-level work requires an approval record and capability token
 - dangerous commands are denied by default
+- live model API calls require `model-call --apply` and a matching token
 
 Duplicate protection is built in:
 
@@ -422,12 +505,12 @@ the path toward the 1.0 closure release.
 Current stable version:
 
 ```text
-1.2.0
+1.3.0
 ```
 
-The 1.2 release adds the governance and sandbox foundation for future
-model-backed subagents: policy files, subagent records, path sandboxes, command
-classification, approvals, capability tokens, audit logs, and CLI checks.
+The 1.3 release adds the model API preparation layer: provider config, API
+doctor checks, request packet generation, dry-run calls, capability-token gates,
+and a governed live-call path for OpenAI-compatible chat-completions providers.
 
 ## Philosophy
 

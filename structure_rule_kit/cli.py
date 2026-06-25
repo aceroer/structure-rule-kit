@@ -56,6 +56,15 @@ from .handoff import build_handoff_pack
 from .mcp_manifest import build_mcp_manifest
 from .mcp_scaffold import scaffold_mcp
 from .mcp_server import run_server
+from .model_api import (
+    load_model_providers,
+    model_call,
+    model_capability_check,
+    model_config_init,
+    model_doctor,
+    model_provider_set,
+    model_request_build,
+)
 from .network import (
     add_comment,
     assign_issue,
@@ -567,6 +576,47 @@ def main(argv: list[str] | None = None) -> int:
     governance_status_parser = subparsers.add_parser("governance-status", help="Show model-agent governance status")
     governance_status_parser.add_argument("--path", default=".")
     governance_status_parser.add_argument("--json", action="store_true")
+
+    model_config_parser = subparsers.add_parser("model-config", help="Initialize or show model API provider config")
+    model_config_parser.add_argument("--path", default=".")
+    model_config_parser.add_argument("--force", action="store_true")
+    model_config_parser.add_argument("--json", action="store_true")
+
+    model_provider_parser = subparsers.add_parser("model-provider-set", help="Set a model API provider")
+    model_provider_parser.add_argument("--path", default=".")
+    model_provider_parser.add_argument("--provider", default="openai")
+    model_provider_parser.add_argument("--endpoint", default="")
+    model_provider_parser.add_argument("--api-key-env", default="")
+    model_provider_parser.add_argument("--model", default="")
+    model_provider_parser.add_argument("--type", default="chat-completions", dest="provider_type")
+
+    model_doctor_parser = subparsers.add_parser("model-doctor", help="Check model API provider readiness")
+    model_doctor_parser.add_argument("--path", default=".")
+    model_doctor_parser.add_argument("--provider", default="openai")
+    model_doctor_parser.add_argument("--json", action="store_true")
+
+    model_request_parser = subparsers.add_parser("model-request", help="Build a governed model API request packet")
+    model_request_parser.add_argument("--path", default=".")
+    model_request_parser.add_argument("--provider", default="openai")
+    model_request_parser.add_argument("--model", default="")
+    model_request_parser.add_argument("--prompt", default="")
+    model_request_parser.add_argument("--issue", default="")
+    model_request_parser.add_argument("--subagent", default="")
+    model_request_parser.add_argument("--system", default="")
+    model_request_parser.add_argument("--output-dir", default="structure/worknet/model_api/requests")
+
+    model_capability_parser = subparsers.add_parser("model-capability-check", help="Check model API capability token")
+    model_capability_parser.add_argument("--path", default=".")
+    model_capability_parser.add_argument("--subagent", default="")
+    model_capability_parser.add_argument("--provider", default="openai")
+    model_capability_parser.add_argument("--action", default="model-call")
+    model_capability_parser.add_argument("--json", action="store_true")
+
+    model_call_parser = subparsers.add_parser("model-call", help="Call a model API request packet")
+    model_call_parser.add_argument("request")
+    model_call_parser.add_argument("--path", default=".")
+    model_call_parser.add_argument("--apply", action="store_true")
+    model_call_parser.add_argument("--json", action="store_true")
 
     args = parser.parse_args(argv)
 
@@ -1271,6 +1321,76 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Tokens: {report['tokens']}")
             print(f"Audit events: {report['audit_events']}")
         return 0 if report["ready"] else 1
+
+    if args.command == "model-config":
+        report = model_config_init(args.path, force=args.force)
+        if args.json:
+            print(json.dumps(load_model_providers(args.path), indent=2))
+        else:
+            print(f"Model API: {Path(report['output'])}")
+            print(f"Providers: {Path(report['providers'])}")
+        return 0
+
+    if args.command == "model-provider-set":
+        report = model_provider_set(
+            args.path,
+            provider=args.provider,
+            endpoint=args.endpoint,
+            api_key_env=args.api_key_env,
+            default_model=args.model,
+            provider_type=args.provider_type,
+        )
+        print(f"Updated {report['provider']}: {Path(report['output'])}")
+        return 0
+
+    if args.command == "model-doctor":
+        report = model_doctor(args.path, provider=args.provider)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print("READY" if report["ready_for_live_call"] else "NEEDS SETUP")
+            print(f"Provider: {report['provider']}")
+            print(f"Endpoint: {report['endpoint'] or 'not configured'}")
+            print(f"API key env: {report['api_key_env'] or 'not configured'}")
+            print(f"API key present: {report['api_key_present']}")
+            print(f"Default model: {report['default_model'] or 'not configured'}")
+        return 0 if report["ok"] else 1
+
+    if args.command == "model-request":
+        report = model_request_build(
+            args.path,
+            provider=args.provider,
+            model=args.model,
+            prompt=args.prompt,
+            issue=args.issue,
+            subagent=args.subagent,
+            system=args.system,
+            output_dir=args.output_dir,
+        )
+        print(f"Wrote {Path(report['output'])}")
+        return 0
+
+    if args.command == "model-capability-check":
+        report = model_capability_check(args.path, subagent=args.subagent, action=args.action, target=args.provider)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print("ALLOWED" if report["ok"] else "DENIED")
+            print(f"Subagent: {report['subagent'] or 'not specified'}")
+            print(f"Provider: {report['target']}")
+        return 0 if report["ok"] else 1
+
+    if args.command == "model-call":
+        report = model_call(args.path, request=args.request, apply=args.apply)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print(f"{report['status'].upper()}: {args.request}")
+            if report.get("output"):
+                print(f"Response: {Path(report['output'])}")
+            if report.get("message"):
+                print(report["message"])
+        return 0 if report["ok"] else 1
 
     parser.error("Unknown command")
     return 2

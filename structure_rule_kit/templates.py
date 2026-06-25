@@ -212,6 +212,17 @@ Add model-agent governance foundations:
 - approval requests and capability tokens
 - audit log for governance actions
 
+## Version 1.3
+
+Prepare real model API integration:
+
+- provider config and API doctor checks
+- model request packet generation
+- dry-run model-call path
+- capability-token gate for live calls
+- response records and model API audit log
+- OpenAI-compatible chat-completions transport
+
 ## Deferred Ideas
 
 - Optional project presets, only if they support the scriptable integration layer.
